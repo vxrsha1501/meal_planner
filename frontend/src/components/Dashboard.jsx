@@ -76,9 +76,9 @@ export default function Dashboard({ data, foodItems, onRefresh, onLogMeal, isLog
   };
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
+    <div className="mx-auto animate-fade-in-up">
       {/* Top Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 items-stretch">
         <StatCard icon="📊" label="BMI" value={user.bmi} sub={getBmiCategory(user.bmi)} gradient="from-cyan-500 to-blue-500" />
         <StatCard
           icon="🎯"
@@ -93,66 +93,69 @@ export default function Dashboard({ data, foodItems, onRefresh, onLogMeal, isLog
       </div>
 
       {/* Today's Progress */}
-      <div className="glass-card p-6">
-        <h2 className="text-lg font-semibold text-white mb-5">Today's Progress</h2>
+      <div className="glass-card rounded-2xl p-4 sm:p-6 shadow-lg shadow-black/20 mt-5 sm:mt-6 w-full">
+        <h2 className="text-base sm:text-lg font-semibold text-white mb-3">Today's Progress</h2>
+        <p className="text-sm text-slate-400 mb-3">Track your calories, budget, and protein intake for today.</p>
 
-        {/* Calories */}
-        <div className="mb-5">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-slate-400">Calories</span>
-            <span className="text-sm font-semibold">
-              <span className="text-white">{progress.calories_consumed}</span>
-              <span className="text-slate-500"> / {progress.calorie_target} cal</span>
-            </span>
+        <div className="space-y-3">
+          {/* Calories */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-400">Calories</span>
+              <span className="text-sm font-semibold">
+                <span className="text-white">{progress.calories_consumed}</span>
+                <span className="text-slate-500"> / {progress.calorie_target} cal</span>
+              </span>
+            </div>
+            <div className="progress-bar">
+              <div className={`progress-fill bg-gradient-to-r ${calColor}`} style={{ width: `${Math.min(calPercent, 100)}%` }} />
+            </div>
+            <div className="flex justify-between mt-1.5">
+              <span className="text-xs text-slate-500">{calPercent}% consumed</span>
+              <span className={`text-xs font-medium ${progress.calories_remaining >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {progress.calories_remaining >= 0
+                  ? `${progress.calories_remaining} cal remaining`
+                  : `${Math.abs(progress.calories_remaining)} cal over`}
+              </span>
+            </div>
           </div>
-          <div className="progress-bar">
-            <div className={`progress-fill bg-gradient-to-r ${calColor}`} style={{ width: `${Math.min(calPercent, 100)}%` }} />
-          </div>
-          <div className="flex justify-between mt-1.5">
-            <span className="text-xs text-slate-500">{calPercent}% consumed</span>
-            <span className={`text-xs font-medium ${progress.calories_remaining >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {progress.calories_remaining >= 0
-                ? `${progress.calories_remaining} cal remaining`
-                : `${Math.abs(progress.calories_remaining)} cal over`}
-            </span>
-          </div>
-        </div>
 
-        {/* Budget */}
-        <div className="mb-5">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-slate-400">Budget</span>
-            <span className="text-sm font-semibold">
-              <span className="text-white">₹{progress.budget_used}</span>
-              <span className="text-slate-500"> / ₹{progress.budget_limit}</span>
-            </span>
+          {/* Budget */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-400">Budget</span>
+              <span className="text-sm font-semibold">
+                <span className="text-white">₹{progress.budget_used}</span>
+                <span className="text-slate-500"> / ₹{progress.budget_limit}</span>
+              </span>
+            </div>
+            <div className="progress-bar">
+              <div className={`progress-fill bg-gradient-to-r ${budgetColor}`} style={{ width: `${Math.min(budgetPercent, 100)}%` }} />
+            </div>
+            <div className="flex justify-between mt-1.5">
+              <span className="text-xs text-slate-500">{budgetPercent}% spent</span>
+              <span className={`text-xs font-medium ${progress.budget_remaining >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {progress.budget_remaining >= 0
+                  ? `₹${progress.budget_remaining} remaining`
+                  : `₹${Math.abs(progress.budget_remaining)} over`}
+              </span>
+            </div>
           </div>
-          <div className="progress-bar">
-            <div className={`progress-fill bg-gradient-to-r ${budgetColor}`} style={{ width: `${Math.min(budgetPercent, 100)}%` }} />
-          </div>
-          <div className="flex justify-between mt-1.5">
-            <span className="text-xs text-slate-500">{budgetPercent}% spent</span>
-            <span className={`text-xs font-medium ${progress.budget_remaining >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {progress.budget_remaining >= 0
-                ? `₹${progress.budget_remaining} remaining`
-                : `₹${Math.abs(progress.budget_remaining)} over`}
-            </span>
-          </div>
-        </div>
 
-        {/* Protein */}
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.03]">
-          <span className="text-sm">🥩</span>
-          <span className="text-sm text-slate-300">
-            Protein consumed: <span className="font-semibold text-cyan-400">{progress.protein_consumed || 0}g</span>
-          </span>
+          {/* Protein */}
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-white/[0.03]">
+            <span className="text-sm">🥩</span>
+            <span className="text-sm text-slate-300">
+              Protein consumed: <span className="font-semibold text-cyan-400">{progress.protein_consumed || 0}g</span>
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Budget Override */}
-      <div className="glass-card p-5">
+      <div className="glass-card rounded-2xl p-4 sm:p-5 shadow-lg shadow-black/20 mt-5 sm:mt-6">
         <h3 className="text-sm font-semibold text-white mb-3">💰 Set Today's Budget</h3>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <input
             type="number"
             value={budgetInput}
@@ -178,7 +181,7 @@ export default function Dashboard({ data, foodItems, onRefresh, onLogMeal, isLog
 
       {/* Status Message */}
       {recommendations?.status_message && (
-        <div className="glass-card p-4">
+        <div className="glass-card rounded-2xl p-5 shadow-lg shadow-black/20 mt-6">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center text-sm shrink-0 mt-0.5">
               🧠
@@ -189,8 +192,9 @@ export default function Dashboard({ data, foodItems, onRefresh, onLogMeal, isLog
       )}
 
       {/* Meal Sections */}
-      <div>
-        <h2 className="text-lg font-semibold text-white mb-4">🍽️ Log Your Meals</h2>
+      <div className="mt-5 sm:mt-6">
+        <h2 className="text-base sm:text-lg font-semibold text-white mb-3">🍽️ Log Your Meals</h2>
+        <p className="text-sm text-slate-400 mb-3">Track breakfast, lunch, and dinner with quantities and custom entries.</p>
         <div className="space-y-4">
           {['breakfast', 'lunch', 'dinner'].map((type) => (
             <MealSection
@@ -206,70 +210,84 @@ export default function Dashboard({ data, foodItems, onRefresh, onLogMeal, isLog
         </div>
       </div>
 
-      {/* Suggested Meal Combos */}
-      {recommendations?.meal_combos?.length > 0 && (
-        <div className="glass-card p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">🥗 Suggested Combinations</h2>
-          <div className="space-y-3">
-            {recommendations.meal_combos.map((combo, idx) => (
-              <div key={idx} className="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-emerald-500/20 transition-colors">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-white">
-                    {combo.items.join(' + ')}
-                  </span>
+      {/* Suggested Meals + Workout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mt-5 sm:mt-6">
+        {/* Suggested Meal Combos */}
+        {recommendations?.meal_combos?.length > 0 ? (
+          <div className="glass-card rounded-2xl p-4 sm:p-6 shadow-lg shadow-black/20 h-full">
+            <h2 className="text-base sm:text-lg font-semibold text-white mb-3">🥗 Suggested Combinations</h2>
+            <p className="text-sm text-slate-400 mb-3">AI-picked combinations based on your current progress.</p>
+            <div className="space-y-3">
+              {recommendations.meal_combos.map((combo, idx) => (
+                <div key={idx} className="p-4 rounded-xl bg-white/[0.03] border border-white/5 hover:border-emerald-500/20 transition-colors">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-white">
+                      {combo.items.join(' + ')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs">
+                    <span className="text-emerald-400">{combo.total_calories} cal</span>
+                    <span className="text-amber-400">₹{combo.total_cost}</span>
+                    <span className="text-cyan-400">{combo.total_protein}g protein</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4 text-xs">
-                  <span className="text-emerald-400">{combo.total_calories} cal</span>
-                  <span className="text-amber-400">₹{combo.total_cost}</span>
-                  <span className="text-cyan-400">{combo.total_protein}g protein</span>
-                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="glass-card rounded-2xl p-4 sm:p-6 shadow-lg shadow-black/20 h-full">
+            <h2 className="text-base sm:text-lg font-semibold text-white mb-3">🥗 Suggested Combinations</h2>
+            <p className="text-sm text-slate-400">Suggestions will appear once enough progress data is available.</p>
+          </div>
+        )}
+
+        {/* Workout Plan */}
+        {recommendations?.workout_suggestion ? (
+          <div className="glass-card rounded-2xl p-4 sm:p-6 shadow-lg shadow-black/20 h-full">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-lg">
+                🏋️
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+              <div>
+                <h2 className="text-base sm:text-lg font-semibold text-white">Workout Plan</h2>
+                <p className="text-sm text-slate-400">Based on your goals and intake</p>
+              </div>
+            </div>
 
-      {/* Workout Plan */}
-      {recommendations?.workout_suggestion && (
-        <div className="glass-card p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-lg">
-              🏋️
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-white">Workout Plan</h2>
-              <p className="text-xs text-slate-400">Based on your goals and intake</p>
+            <div className="rounded-xl bg-gradient-to-br from-violet-500/10 to-purple-600/5 border border-violet-500/20 p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xl font-bold text-white">
+                  {recommendations.workout_suggestion.activity}
+                </h3>
+                <span className="text-sm font-semibold text-violet-400 bg-violet-500/15 px-3 py-1 rounded-full">
+                  ⏱ {recommendations.workout_suggestion.duration}
+                </span>
+              </div>
+              <p className="text-sm text-slate-300 leading-relaxed mb-4">
+                {recommendations.workout_suggestion.description}
+              </p>
+              {!today_workout && (
+                <button
+                  onClick={handleLogWorkout}
+                  disabled={workoutLogging}
+                  className="btn-secondary text-xs"
+                  id="btn-log-workout"
+                >
+                  {workoutLogging ? 'Logging...' : '✅ Mark as Done'}
+                </button>
+              )}
+              {today_workout && (
+                <p className="text-xs text-emerald-400 font-medium">✅ Workout completed today!</p>
+              )}
             </div>
           </div>
-
-          <div className="rounded-xl bg-gradient-to-br from-violet-500/10 to-purple-600/5 border border-violet-500/20 p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xl font-bold text-white">
-                {recommendations.workout_suggestion.activity}
-              </h3>
-              <span className="text-sm font-semibold text-violet-400 bg-violet-500/15 px-3 py-1 rounded-full">
-                ⏱ {recommendations.workout_suggestion.duration}
-              </span>
-            </div>
-            <p className="text-sm text-slate-300 leading-relaxed mb-4">
-              {recommendations.workout_suggestion.description}
-            </p>
-            {!today_workout && (
-              <button
-                onClick={handleLogWorkout}
-                disabled={workoutLogging}
-                className="btn-secondary text-xs"
-                id="btn-log-workout"
-              >
-                {workoutLogging ? 'Logging...' : '✅ Mark as Done'}
-              </button>
-            )}
-            {today_workout && (
-              <p className="text-xs text-emerald-400 font-medium">✅ Workout completed today!</p>
-            )}
+        ) : (
+          <div className="glass-card rounded-2xl p-4 sm:p-6 shadow-lg shadow-black/20 h-full">
+            <h2 className="text-base sm:text-lg font-semibold text-white mb-3">Workout Plan</h2>
+            <p className="text-sm text-slate-400">Workout recommendation is currently unavailable.</p>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -277,15 +295,15 @@ export default function Dashboard({ data, foodItems, onRefresh, onLogMeal, isLog
 /* ── Sub-components ── */
 function StatCard({ icon, label, value, sub, gradient, isText }) {
   return (
-    <div className="glass-card p-4 group hover:scale-[1.02] transition-transform">
+    <div className="glass-card rounded-2xl p-4 sm:p-5 shadow-lg shadow-black/20 group hover:scale-[1.02] transition-transform h-full flex flex-col justify-between">
       <div className="flex items-center gap-2 mb-2">
         <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center text-sm`}>
           {icon}
         </div>
         <span className="text-xs text-slate-400 uppercase tracking-wider">{label}</span>
       </div>
-      <p className={`font-bold ${isText ? 'text-base' : 'text-2xl'} text-white`}>{value}</p>
-      {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
+      <p className={`font-bold ${isText ? 'text-base' : 'text-xl sm:text-2xl'} text-white`}>{value}</p>
+      {sub && <p className="text-xs sm:text-sm text-slate-500 mt-0.5">{sub}</p>}
     </div>
   );
 }

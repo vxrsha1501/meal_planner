@@ -1,6 +1,6 @@
 # 🧠 AI Budget-Aware Lifestyle Planner
 
-An intelligent lifestyle planner that helps users maintain a healthy lifestyle while staying within a daily budget. Track calories, manage food spending, and get AI-powered meal and workout recommendations in real time.
+An intelligent lifestyle planner that helps users maintain a healthy lifestyle while staying within a daily budget. Track calories, protein, manage food spending, and get AI-powered meal & workout recommendations in real time.
 
 ![Stack](https://img.shields.io/badge/Flask-Python-blue) ![Stack](https://img.shields.io/badge/React-Vite-purple) ![Stack](https://img.shields.io/badge/Tailwind_CSS-v4-cyan) ![Stack](https://img.shields.io/badge/MySQL-Database-orange)
 
@@ -8,12 +8,16 @@ An intelligent lifestyle planner that helps users maintain a healthy lifestyle w
 
 ## 🎯 Features
 
-- **User Profile Setup** — Enter height, weight, age, goal, and budget → auto-calculates BMI & calorie target
-- **Food Logging** — Select from 20 predefined food items with quantity tracking
-- **Budget Tracking** — Real-time spending tracker with visual progress bars
-- **AI Decision Engine** — Rule-based engine suggests meals & workouts based on your remaining calories, budget, and goal
-- **Workout Recommendations** — Goal-specific exercise suggestions (cardio, strength, yoga, etc.)
-- **Live Dashboard** — Beautiful dark-themed UI with glassmorphism cards, animations, and progress indicators
+- **Authentication** — Signup + Login with hashed passwords (Flask sessions)
+- **User Profile** — Height, weight, age, goal (with target weight), BMI auto-calculation
+- **Meal Logging** — Breakfast, Lunch, Dinner with checkbox selection + quantity
+- **Custom Food** — Add your own food items with calories, cost, protein
+- **Budget System** — Default budget at signup + optional daily overrides
+- **AI Decision Engine** — Rule-based suggestions for meals & workouts
+- **Meal Combos** — Auto-generated 2-item meal combinations within budget
+- **Workout Recommendations** — Goal-specific exercises with logging
+- **Weekly Report** — Bar charts for calories, protein, spending + workout history
+- **Live Dashboard** — Glassmorphism UI with progress bars and live updates
 
 ---
 
@@ -22,22 +26,25 @@ An intelligent lifestyle planner that helps users maintain a healthy lifestyle w
 ```
 meal_planner/
 ├── backend/
-│   ├── app.py                # Flask REST API (all endpoints)
+│   ├── app.py                # Flask REST API (auth, all endpoints)
 │   ├── decision_engine.py    # Rule-based recommendation engine
 │   ├── config.py             # Database & app configuration
-│   ├── seed_data.py          # Predefined food dataset + seeding
-│   ├── schema.sql            # MySQL schema (for reference)
+│   ├── seed_data.py          # Predefined food dataset (with protein)
+│   ├── schema.sql            # MySQL schema (6 tables)
 │   ├── .env                  # Environment variables
 │   └── requirements.txt      # Python dependencies
 │
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── ProfileForm.jsx    # User profile setup
-│   │   │   ├── MealLogger.jsx     # Food logging with preview
-│   │   │   ├── Dashboard.jsx      # Progress bars & meal history
-│   │   │   └── SuggestionsCard.jsx # AI meal & workout suggestions
-│   │   ├── App.jsx            # Root component (layout + state)
+│   │   │   ├── Login.jsx         # Login page
+│   │   │   ├── Signup.jsx        # Registration + profile setup
+│   │   │   ├── Sidebar.jsx       # Left navigation sidebar
+│   │   │   ├── Dashboard.jsx     # Main dashboard with everything
+│   │   │   ├── MealSection.jsx   # Breakfast/Lunch/Dinner meal sections
+│   │   │   ├── Profile.jsx       # User info + change password
+│   │   │   └── WeeklyReport.jsx  # Charts + workout history
+│   │   ├── App.jsx            # Root component (auth + routing)
 │   │   ├── api.js             # Backend API utility
 │   │   └── index.css          # Tailwind CSS + custom styles
 │   ├── index.html
@@ -55,7 +62,6 @@ meal_planner/
 
 - **Python 3.9+**
 - **Node.js 18+**
-- **MySQL** (optional — SQLite works out of the box)
 
 ### 1. Backend Setup
 
@@ -77,20 +83,14 @@ pip install -r requirements.txt
 
 #### Database Configuration
 
-**Option A: SQLite (default — zero setup)**
-
-The `.env` file is preconfigured with `USE_SQLITE=true`. Just run the app.
-
-**Option B: MySQL**
+**MySQL (required):**
 
 1. Create the database:
    ```sql
    CREATE DATABASE meal_planner;
    ```
-
 2. Update `backend/.env`:
    ```env
-   USE_SQLITE=false
    DB_USER=root
    DB_PASSWORD=your_password
    DB_HOST=localhost
@@ -104,7 +104,45 @@ The `.env` file is preconfigured with `USE_SQLITE=true`. Just run the app.
 python app.py
 ```
 
-The API will run on `http://localhost:5000`.
+API runs on `http://localhost:5000`.
+
+#### One-Command Backend Bootstrap (Windows PowerShell)
+
+From the project root, run:
+
+```powershell
+.\bootstrap_backend_mysql.ps1
+```
+
+This will:
+- read MySQL credentials from `backend/.env`
+- apply `backend/schema.sql`
+- start the Flask backend
+
+If you already applied the schema and only want to start Flask:
+
+```powershell
+.\bootstrap_backend_mysql.ps1 -SkipSchema
+```
+
+#### One-Command Fullstack Launch (Windows PowerShell)
+
+From the project root, run:
+
+```powershell
+.\start_fullstack.ps1
+```
+
+This will:
+- start backend in a new PowerShell window (without re-importing schema)
+- install frontend dependencies if needed
+- start Vite frontend in the current terminal
+
+If you want schema initialization as part of startup:
+
+```powershell
+.\start_fullstack.ps1 -InitSchema
+```
 
 ### 2. Frontend Setup
 
@@ -118,7 +156,7 @@ npm install
 npm run dev
 ```
 
-The app will run on `http://localhost:5173`.
+App runs on `http://localhost:5173`.
 
 > The Vite dev server proxies `/api` requests to the Flask backend, so both servers must be running.
 
@@ -126,64 +164,97 @@ The app will run on `http://localhost:5173`.
 
 ## 🔌 API Endpoints
 
-| Method | Endpoint            | Description                              |
-|--------|---------------------|------------------------------------------|
-| POST   | `/user/setup`       | Create user profile (BMI + calorie calc) |
-| POST   | `/meal/log`         | Log a meal, update daily totals          |
-| GET    | `/dashboard`        | Full dashboard: progress + recommendations |
-| GET    | `/recommendations`  | Meal & workout suggestions only          |
-| GET    | `/food-items`       | List all available food items            |
-| POST   | `/user/reset`       | Reset daily counters for a new day       |
+### Auth
+| Method | Endpoint             | Description                    |
+|--------|----------------------|--------------------------------|
+| POST   | `/signup`            | Create account + profile       |
+| POST   | `/login`             | Login with username/password   |
+| POST   | `/logout`            | End session                    |
+| GET    | `/me`                | Check current session          |
+
+### Profile
+| Method | Endpoint             | Description                    |
+|--------|----------------------|--------------------------------|
+| GET    | `/profile`           | Get user profile               |
+| POST   | `/profile/password`  | Change password                |
+
+### Dashboard & Meals
+| Method | Endpoint             | Description                    |
+|--------|----------------------|--------------------------------|
+| GET    | `/dashboard`         | Full dashboard data            |
+| POST   | `/meal/log`          | Log a meal (breakfast/lunch/dinner) |
+| GET    | `/food-items`        | List all food items            |
+| GET    | `/recommendations`   | Get suggestions                |
+
+### Budget & Workout
+| Method | Endpoint             | Description                    |
+|--------|----------------------|--------------------------------|
+| POST   | `/budget/update`     | Set today's budget override    |
+| POST   | `/workout/log`       | Log a completed workout        |
+| GET    | `/weekly-report`     | Last 7 days data for charts    |
 
 ---
 
-## 🧠 Decision Engine Logic
+## 📋 Example API Usage
 
-The engine runs after every meal log and uses rule-based scoring:
+### Sign Up
+```bash
+curl -X POST http://localhost:5000/signup \
+  -H "Content-Type: application/json" \
+  -d '{"name":"John","username":"john","password":"pass123","height_cm":170,"weight_kg":70,"age":25,"goal":"lose","target_weight":65,"default_budget":500}'
+```
 
-1. **Situation Assessment** — Classifies the user's state (high/low calories remaining, budget tight/comfortable, goal)
-2. **Meal Scoring** — Each food item is scored based on:
-   - Calorie alignment with remaining target
-   - Budget affordability
-   - Goal-specific preferences (protein for gain, veggies for lose)
-   - Cost efficiency (calories per rupee)
-3. **Workout Selection** — Maps goal + calorie state to appropriate exercise
-4. **Status Message** — Human-readable progress summary
+### Login
+```bash
+curl -X POST http://localhost:5000/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"john","password":"pass123"}'
+```
+
+### Log a Meal
+```bash
+curl -X POST http://localhost:5000/meal/log \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{"meal_type":"breakfast","items":[{"food_item":"Egg","quantity":2},{"food_item":"Oats (1 cup)","quantity":1}]}'
+```
+
+### Set Budget Override
+```bash
+curl -X POST http://localhost:5000/budget/update \
+  -H "Content-Type: application/json" \
+  -b cookies.txt \
+  -d '{"amount":300}'
+```
 
 ---
 
-## 🍽️ Food Dataset
+## 🗄️ Database Tables
 
-20 predefined items across 6 categories:
-
-| Category  | Items |
-|-----------|-------|
-| Protein   | Egg, Paneer, Chicken, Dal, Tofu, Fish, Protein Shake |
-| Carbs     | Rice, Roti, Oats, Bread, Pasta, Sweet Potato |
-| Fruit     | Banana, Apple |
-| Dairy     | Milk, Yogurt, Cheese |
-| Vegetable | Salad Bowl |
-| Fat       | Peanut Butter |
+| Table          | Description                          |
+|----------------|--------------------------------------|
+| `users_auth`   | Login credentials (hashed passwords) |
+| `users`        | Profile, BMI, calorie target         |
+| `food_items`   | Predefined + custom foods            |
+| `meals_log`    | Logged meals with type + date        |
+| `workout_log`  | Logged workouts per day              |
+| `daily_budget` | Optional daily budget overrides      |
 
 ---
 
-## 🔄 Workflow
+## 🧠 Decision Engine
 
-1. User sets profile → BMI & calorie target calculated
-2. User logs meals from predefined list
-3. System updates calories consumed & budget used
-4. Decision engine generates real-time recommendations
-5. Dashboard updates with progress bars & suggestions
+- **Situation Assessment** — Classifies calorie + budget state
+- **Meal Scoring** — Ranks foods by calorie/budget/protein/goal alignment
+- **Meal Combos** — Generates 2-item combinations within constraints
+- **Workout Selection** — Maps goal + calorie state to exercises
+- **Status Message** — Human-readable progress summary
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Backend**: Python Flask, Flask-SQLAlchemy, Flask-CORS
-- **Frontend**: React 19, Vite 8, Tailwind CSS v4
-- **Database**: MySQL (primary) / SQLite (fallback)
-- **Architecture**: REST API + Rule-based decision engine
-
----
-
-*Built for Hackathon 2026* 🚀
+- **Backend**: Python Flask, Flask-SQLAlchemy, Flask-Login, Flask-CORS
+- **Frontend**: React 19, Vite 8, Tailwind CSS v4, React Router, Recharts
+- **Database**: MySQL
+- **Authentication**: Flask sessions + werkzeug password hashing

@@ -118,15 +118,15 @@ export default function MealSection({
   );
 
   return (
-    <div className="glass-card p-5 animate-fade-in-up">
+    <div className="glass-card rounded-2xl p-4 sm:p-5 shadow-lg shadow-black/20 animate-fade-in-up">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-2">
         <div className="flex items-center gap-2">
           <span className="text-xl">{meta.icon}</span>
-          <h3 className="text-base font-semibold text-white">{meta.label}</h3>
+          <h3 className="text-base sm:text-lg font-semibold text-white">{meta.label}</h3>
         </div>
         {loggedMeals.length > 0 && (
-          <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-2 sm:gap-3 text-xs">
             <span className="text-emerald-400">{loggedCal} cal</span>
             <span className="text-amber-400">₹{loggedCost}</span>
             <span className="text-cyan-400">{loggedProtein}g protein</span>
@@ -152,7 +152,7 @@ export default function MealSection({
       )}
 
       {/* Food items list with checkboxes */}
-      <div className="space-y-1.5 max-h-52 overflow-y-auto mb-4 pr-1">
+      <div className="space-y-2 max-h-56 overflow-y-auto mb-4 pr-1">
         {foodItems.map((food) => {
           const isSelected = !!selectedItems[food.name];
           const isRecommended = recNames.has(food.name);
@@ -160,38 +160,40 @@ export default function MealSection({
           return (
             <div
               key={food.name}
-              className={`flex items-center gap-3 py-2 px-3 rounded-lg transition-all cursor-pointer ${
+              className={`flex items-start sm:items-center justify-between py-2 px-3 rounded-lg transition-all cursor-pointer gap-2 ${
                 isSelected
                   ? 'bg-emerald-500/10 border border-emerald-500/20'
                   : 'bg-white/[0.02] border border-transparent hover:bg-white/[0.05]'
               }`}
               onClick={() => toggleItem(food.name)}
             >
-              <input
-                type="checkbox"
-                checked={isSelected}
-                onChange={() => toggleItem(food.name)}
-                className="custom-checkbox"
-                onClick={(e) => e.stopPropagation()}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-200 truncate">{food.name}</span>
-                  {isRecommended && (
-                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-medium">
-                      Recommended
+              <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => toggleItem(food.name)}
+                  className="custom-checkbox"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    <span className="text-sm text-slate-200 truncate">{food.name}</span>
+                    {isRecommended && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-medium">
+                        Recommended
+                      </span>
+                    )}
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+                      categoryColors[food.category] || 'bg-slate-500/20 text-slate-400'
+                    }`}>
+                      {food.category}
                     </span>
-                  )}
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
-                    categoryColors[food.category] || 'bg-slate-500/20 text-slate-400'
-                  }`}>
-                    {food.category}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-0.5">
-                  <span>{food.calories} cal</span>
-                  <span>₹{food.cost}</span>
-                  <span>{food.protein || 0}g protein</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[11px] text-slate-500 mt-0.5">
+                    <span>{food.calories} cal</span>
+                    <span>₹{food.cost}</span>
+                    <span>{food.protein || 0}g protein</span>
+                  </div>
                 </div>
               </div>
               {isSelected && (
@@ -199,15 +201,15 @@ export default function MealSection({
                   <button
                     type="button"
                     onClick={() => setItemQuantity(food.name, selectedItems[food.name].quantity - 1)}
-                    className="w-6 h-6 rounded bg-white/10 text-xs text-slate-300 hover:bg-white/20 flex items-center justify-center"
+                    className="w-7 h-7 sm:w-6 sm:h-6 rounded bg-white/10 text-sm sm:text-xs text-slate-300 hover:bg-white/20 flex items-center justify-center"
                   >−</button>
-                  <span className="text-xs text-white w-5 text-center">
+                  <span className="text-xs text-white w-6 sm:w-5 text-center">
                     {selectedItems[food.name].quantity}
                   </span>
                   <button
                     type="button"
                     onClick={() => setItemQuantity(food.name, selectedItems[food.name].quantity + 1)}
-                    className="w-6 h-6 rounded bg-white/10 text-xs text-slate-300 hover:bg-white/20 flex items-center justify-center"
+                    className="w-7 h-7 sm:w-6 sm:h-6 rounded bg-white/10 text-sm sm:text-xs text-slate-300 hover:bg-white/20 flex items-center justify-center"
                   >+</button>
                 </div>
               )}
@@ -235,7 +237,7 @@ export default function MealSection({
               placeholder="Food name"
               className="input-field text-xs py-2"
             />
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <input
                 type="number"
                 value={customFood.calories}
