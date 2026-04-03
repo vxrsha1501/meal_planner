@@ -6,6 +6,7 @@ from decision_engine import get_recommendations
 
 from ..auth import get_current_user
 from ..db import get_supabase
+from ..services.llm_service import generate_ai_recipe_recommendations
 from ..schemas import BudgetUpdateRequest, MealLogRequest, WeeklyReportResponse, WorkoutLogRequest
 from .deps import get_today_budget, get_today_totals, load_user_with_profile
 
@@ -52,6 +53,16 @@ async def get_dashboard(current_user=Depends(get_current_user), supabase=Depends
         food_items,
         total_protein,
     )
+
+    ai_recipe_context = {
+        "goal": profile["goal"],
+        "body_type": profile.get("body_type"),
+        "calories_remaining": calories_remaining,
+        "budget_remaining": budget_remaining,
+        "protein_consumed": total_protein,
+        "top_meal_suggestions": [item.get("name") for item in recommendations.get("meal_suggestions", [])],
+    }
+    recommendations["ai_recommended_recipes"] = await generate_ai_recipe_recommendations(ai_recipe_context)
 
     workout_rows = (
         supabase.table("workout_log")
@@ -130,23 +141,6 @@ async def log_meal(payload: MealLogRequest, current_user=Depends(get_current_use
             carbs = float(item_data.carbs or 0) * quantity
             fat = float(item_data.fat or 0) * quantity
 
-            if food_name and cal > 0:
-                existing = supabase.table("food_items").select("id").eq("name", food_name).limit(1).execute()
-                if not existing.data:
-                    supabase.table("food_items").insert(
-                        {
-                            "name": food_name,
-                            "calories": int(item_data.calories or 0),
-                            "cost": float(item_data.cost or 0),
-                            "protein": float(item_data.protein or 0),
-                            "carbs": float(item_data.carbs or 0),
-                            "fat": float(item_data.fat or 0),
-                            "category": "custom",
-                            "is_custom": True,
-                            "created_by": current_user["id"],
-                        }
-                    ).execute()
-
         supabase.table("meals_log").insert(
             {
                 "user_id": current_user["id"],
@@ -197,9 +191,7 @@ async def log_meal(payload: MealLogRequest, current_user=Depends(get_current_use
 @router.get("/food-items")
 async def list_food_items(current_user=Depends(get_current_user), supabase=Depends(get_supabase)) -> dict:
     public_items = supabase.table("food_items").select("*").eq("is_custom", False).execute().data or []
-    custom_items = supabase.table("food_items").select("*").eq("created_by", current_user["id"]).execute().data or []
-    merged = {item["name"]: item for item in [*public_items, *custom_items]}
-    return {"food_items": list(merged.values())}
+    return {"food_items": public_items}
 
 
 @router.post("/budget/update")

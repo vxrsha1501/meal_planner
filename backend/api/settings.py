@@ -14,7 +14,8 @@ class Settings(BaseSettings):
 
     groq_api_key: str | None = None
     api_key: str | None = None
-    groq_model: str = "llama-3.1-70b-versatile"
+    groq_model: str = "llama-3.3-70b-versatile"
+    groq_vision_model: str = "meta-llama/llama-4-scout-17b-16e-instruct"
 
     cors_origin: str = "http://localhost:5173"
     cookie_name: str = "access_token"

@@ -36,6 +36,7 @@ async def get_recommendations(
     meal_combos = _suggest_combos(
         food_items, calories_remaining, budget_remaining, user_goal
     )
+    recommended_recipes = _suggest_recipes(meal_suggestions, user_goal, situation)
 
     workout_suggestion = _suggest_workout(calories_remaining, user_goal, situation)
     status_message = _generate_status(calories_remaining, budget_remaining, situation)
@@ -43,6 +44,7 @@ async def get_recommendations(
     return {
         "meal_suggestions": meal_suggestions,
         "meal_combos": meal_combos,
+        "recommended_recipes": recommended_recipes,
         "workout_suggestion": workout_suggestion,
         "status_message": status_message,
     }
@@ -347,6 +349,88 @@ def _suggest_workout(calories_remaining, user_goal, situation):
                 "description": "15 min walk + 10 min bodyweight exercises (push-ups, planks, squats). Balanced activity for maintenance.",
                 "intensity": "moderate",
             }
+
+
+def _suggest_recipes(meal_suggestions, user_goal, situation):
+    """Create simple default recipe recommendations based on goal and current situation."""
+    recipes = []
+
+    suggestion_names = [item.get("name", "") for item in (meal_suggestions or [])]
+
+    if user_goal == "lose":
+        recipes.append(
+            {
+                "name": "High-Protein Veg Bowl",
+                "prep_time_min": 18,
+                "ingredients": ["Paneer", "Mixed vegetables", "Lemon", "Pepper", "Salt"],
+                "steps": [
+                    "Saute vegetables with minimal oil for 5-6 minutes.",
+                    "Add paneer cubes and cook for 3-4 minutes.",
+                    "Season with lemon, salt, and pepper before serving.",
+                ],
+                "reason": "Low calorie density with strong protein support for fat loss.",
+            }
+        )
+    elif user_goal == "gain":
+        recipes.append(
+            {
+                "name": "Calorie-Dense Power Khichdi",
+                "prep_time_min": 25,
+                "ingredients": ["Rice", "Moong dal", "Ghee", "Peanuts", "Curd"],
+                "steps": [
+                    "Pressure cook rice and dal with water until soft.",
+                    "Top with ghee and roasted peanuts.",
+                    "Serve with curd for extra calories and protein.",
+                ],
+                "reason": "Balanced carbs + fats + protein for healthy weight gain.",
+            }
+        )
+    else:
+        recipes.append(
+            {
+                "name": "Balanced Home Meal Plate",
+                "prep_time_min": 20,
+                "ingredients": ["Roti", "Dal", "Seasonal sabzi", "Curd"],
+                "steps": [
+                    "Prepare dal with basic tempering.",
+                    "Cook sabzi with moderate oil and spices.",
+                    "Serve with roti and curd for a balanced plate.",
+                ],
+                "reason": "Steady macros and budget-friendly maintenance meal.",
+            }
+        )
+
+    if suggestion_names:
+        recipes.append(
+            {
+                "name": f"Quick {suggestion_names[0]} Recipe",
+                "prep_time_min": 15,
+                "ingredients": [suggestion_names[0], "Onion", "Tomato", "Basic spices"],
+                "steps": [
+                    "Prep and chop ingredients.",
+                    "Cook with spices on medium flame for 8-10 minutes.",
+                    "Adjust seasoning and serve warm.",
+                ],
+                "reason": "Built from top current suggestion for your present calorie/budget scenario.",
+            }
+        )
+
+    if "budget_tight" in situation or "budget_exceeded" in situation:
+        recipes.append(
+            {
+                "name": "Low-Cost Protein Chilla",
+                "prep_time_min": 12,
+                "ingredients": ["Besan", "Onion", "Green chili", "Salt", "Water"],
+                "steps": [
+                    "Mix besan, chopped onion, spices, and water into batter.",
+                    "Spread on hot pan and cook both sides.",
+                    "Serve with chutney or curd.",
+                ],
+                "reason": "Cost-effective and protein-aware for tight budget days.",
+            }
+        )
+
+    return recipes[:3]
 
 
 def _generate_status(calories_remaining, budget_remaining, situation):

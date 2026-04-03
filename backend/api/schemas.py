@@ -102,6 +102,37 @@ class LLMMealQueryRequest(BaseModel):
     query: str
 
 
+class WorkoutPlanRequest(BaseModel):
+    workout_preference: str
+    notes: str = ""
+
+
+class MealGuidanceOption(BaseModel):
+    meal: Literal["breakfast", "lunch", "dinner"]
+    title: str
+    calories: int
+    estimated_cost_inr: float
+    protein_g: float
+    carbs_g: float
+    fat_g: float
+    reason: str
+
+
+class MealGuidanceResponse(BaseModel):
+    analysis: dict[str, Any]
+    analysis_pretty: str
+
+
+class MealImageAnalysisResponse(BaseModel):
+    analysis: dict[str, Any]
+    analysis_pretty: str
+
+
+class WorkoutPlanResponse(BaseModel):
+    analysis: dict[str, Any]
+    analysis_pretty: str
+
+
 class ReceiptScanResponse(BaseModel):
     extracted_total: float
     scanned_text: str
