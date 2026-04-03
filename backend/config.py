@@ -1,7 +1,6 @@
 """
 Configuration for the Flask application.
 Supports MySQL (primary) and SQLite (fallback for quick local dev).
-Set environment variables or create a .env file to configure.
 """
 import os
 from dotenv import load_dotenv
@@ -33,3 +32,7 @@ class Config:
         )
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    # Session config
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
