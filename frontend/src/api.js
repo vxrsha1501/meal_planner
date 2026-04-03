@@ -1,17 +1,19 @@
 /**
  * API utility — handles all communication with the Flask backend.
  * Uses the Vite proxy (/api → http://localhost:5000) in dev mode.
+ * All requests include credentials for session cookies.
  */
 
 const BASE_URL = '/api';
 
 /**
- * Generic fetch wrapper with error handling.
+ * Generic fetch wrapper with error handling and session support.
  */
 async function request(endpoint, options = {}) {
   const url = `${BASE_URL}${endpoint}`;
   const config = {
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     ...options,
   };
 
@@ -22,7 +24,6 @@ async function request(endpoint, options = {}) {
     throw new Error('Cannot reach the backend server. Is Flask running on port 5000?');
   }
 
-  // Try to parse JSON — handle empty or non-JSON responses gracefully
   let data;
   const text = await response.text();
   try {
@@ -41,47 +42,91 @@ async function request(endpoint, options = {}) {
   return data;
 }
 
-// ── User Endpoints ──
+// ── Auth Endpoints ──
 
-export async function setupUser(profile) {
-  return request('/user/setup', {
+export async function signup(userData) {
+  return request('/signup', {
     method: 'POST',
-    body: JSON.stringify(profile),
+    body: JSON.stringify(userData),
   });
 }
 
-export async function resetDaily(userId) {
-  return request('/user/reset', {
+export async function login(username, password) {
+  return request('/login', {
     method: 'POST',
-    body: JSON.stringify({ user_id: userId }),
+    body: JSON.stringify({ username, password }),
   });
 }
 
-// ── Meal Endpoints ──
+export async function logout() {
+  return request('/logout', { method: 'POST' });
+}
 
-export async function logMeal(userId, foodItem, quantity) {
-  return request('/meal/log', {
+export async function getMe() {
+  return request('/me');
+}
+
+// ── Profile Endpoints ──
+
+export async function getProfile() {
+  return request('/profile');
+}
+
+export async function changePassword(currentPassword, newPassword) {
+  return request('/profile/password', {
     method: 'POST',
     body: JSON.stringify({
-      user_id: userId,
-      food_item: foodItem,
-      quantity: quantity,
+      current_password: currentPassword,
+      new_password: newPassword,
     }),
   });
 }
 
-// ── Dashboard & Recommendations ──
+// ── Dashboard ──
 
-export async function getDashboard(userId) {
-  return request(`/dashboard?user_id=${userId}`);
+export async function getDashboard() {
+  return request('/dashboard');
 }
 
-export async function getRecommendations(userId) {
-  return request(`/recommendations?user_id=${userId}`);
-}
+// ── Meal Endpoints ──
 
-// ── Food Items ──
+export async function logMeal(mealType, items) {
+  return request('/meal/log', {
+    method: 'POST',
+    body: JSON.stringify({ meal_type: mealType, items }),
+  });
+}
 
 export async function getFoodItems() {
   return request('/food-items');
+}
+
+// ── Budget ──
+
+export async function updateBudget(amount) {
+  return request('/budget/update', {
+    method: 'POST',
+    body: JSON.stringify({ amount }),
+  });
+}
+
+// ── Recommendations ──
+
+export async function getRecommendations() {
+  return request('/recommendations');
+}
+
+// ── Workout ──
+
+export async function logWorkout(activity, duration, description) {
+  return request('/workout/log', {
+    method: 'POST',
+    body: JSON.stringify({ activity, duration, description }),
+  });
+}
+
+// ── Weekly Report ──
+
+export async function getWeeklyReport() {
+  return request('/weekly-report');
 }
