@@ -1,10 +1,11 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
+import useAuthStore from '../store/authStore';
 
 /**
  * Sidebar — Left navigation with profile info and nav links.
  */
-export default function Sidebar({ user, onLogout }) {
-  const location = useLocation();
+export default function Sidebar({ onLogout }) {
+  const user = useAuthStore((state) => state.user);
 
   const navItems = [
     { to: '/dashboard', icon: '📊', label: 'Dashboard' },

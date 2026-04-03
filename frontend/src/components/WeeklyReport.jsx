@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { getWeeklyReport } from '../api';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -9,23 +9,10 @@ import {
  * WeeklyReport — Bar chart for last 7 days + workout summary.
  */
 export default function WeeklyReport() {
-  const [report, setReport] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadReport();
-  }, []);
-
-  const loadReport = async () => {
-    try {
-      const data = await getWeeklyReport();
-      setReport(data);
-    } catch (err) {
-      console.error('Failed to load weekly report:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: report, isLoading: loading } = useQuery({
+    queryKey: ['weekly-report'],
+    queryFn: getWeeklyReport,
+  });
 
   if (loading) {
     return (

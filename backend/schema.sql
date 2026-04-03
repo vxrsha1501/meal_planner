@@ -1,83 +1,101 @@
--- ============================================
--- AI Budget-Aware Lifestyle Planner
--- MySQL Database Schema (v2 — with auth)
--- ============================================
+-- Supabase PostgreSQL schema for AI Budget-Aware Lifestyle Planner
 
-CREATE DATABASE IF NOT EXISTS meal_planner;
-USE meal_planner;
-
--- Authentication credentials
-CREATE TABLE IF NOT EXISTS users_auth (
-    id              INT AUTO_INCREMENT PRIMARY KEY,
-    username        VARCHAR(50) NOT NULL UNIQUE,
-    password_hash   VARCHAR(256) NOT NULL,
-    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+create table if not exists users_auth (
+  id bigserial primary key,
+  username varchar(50) not null unique,
+  password_hash varchar(256) not null,
+  created_at timestamptz not null default now()
 );
 
--- User profile + default budget
-CREATE TABLE IF NOT EXISTS users (
-    id              INT AUTO_INCREMENT PRIMARY KEY,
-    auth_id         INT NOT NULL UNIQUE,
-    name            VARCHAR(100) NOT NULL,
-    height_cm       FLOAT NOT NULL,
-    weight_kg       FLOAT NOT NULL,
-    age             INT NOT NULL,
-    goal            VARCHAR(20) NOT NULL,          -- 'lose', 'gain', 'maintain'
-    target_weight   FLOAT DEFAULT NULL,            -- Only for lose/gain
-    default_budget  FLOAT NOT NULL,                -- Default daily food budget
-    bmi             FLOAT NOT NULL,
-    calorie_target  INT NOT NULL,
-    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (auth_id) REFERENCES users_auth(id) ON DELETE CASCADE
+create table if not exists users (
+  id bigserial primary key,
+  auth_id bigint not null unique references users_auth(id) on delete cascade,
+  name varchar(100) not null,
+  height_cm double precision not null,
+  weight_kg double precision not null,
+  age integer not null,
+  body_type varchar(20) not null default 'mesomorph',
+  goal varchar(20) not null,
+  target_weight double precision,
+  default_budget double precision not null,
+  bmi double precision not null,
+  calorie_target integer not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
--- Food items dataset
-CREATE TABLE IF NOT EXISTS food_items (
-    id          INT AUTO_INCREMENT PRIMARY KEY,
-    name        VARCHAR(100) NOT NULL UNIQUE,
-    calories    INT NOT NULL,
-    cost        FLOAT NOT NULL,
-    protein     FLOAT NOT NULL DEFAULT 0,
-    category    VARCHAR(50) NOT NULL,
-    is_custom   BOOLEAN DEFAULT FALSE,
-    created_by  INT DEFAULT NULL,
-    FOREIGN KEY (created_by) REFERENCES users_auth(id) ON DELETE SET NULL
+create table if not exists food_items (
+  id bigserial primary key,
+  name varchar(100) not null unique,
+  calories integer not null,
+  cost double precision not null,
+  protein double precision not null default 0,
+  carbs double precision not null default 0,
+  fat double precision not null default 0,
+  category varchar(50) not null,
+  is_custom boolean not null default false,
+  created_by bigint references users_auth(id) on delete set null
 );
 
--- Meals log — tracks what the user has eaten
-CREATE TABLE IF NOT EXISTS meals_log (
-    id              INT AUTO_INCREMENT PRIMARY KEY,
-    user_id         INT NOT NULL,
-    food_item       VARCHAR(100) NOT NULL,
-    quantity        INT NOT NULL DEFAULT 1,
-    meal_type       VARCHAR(20) NOT NULL,          -- 'breakfast', 'lunch', 'dinner'
-    total_calories  INT NOT NULL,
-    total_cost      FLOAT NOT NULL,
-    total_protein   FLOAT NOT NULL DEFAULT 0,
-    logged_date     DATE NOT NULL,
-    logged_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users_auth(id) ON DELETE CASCADE
+create table if not exists meals_log (
+  id bigserial primary key,
+  user_id bigint not null references users_auth(id) on delete cascade,
+  food_item varchar(100) not null,
+  quantity integer not null default 1,
+  meal_type varchar(20) not null check (meal_type in ('breakfast', 'lunch', 'dinner')),
+  total_calories integer not null,
+  total_cost double precision not null,
+  total_protein double precision not null default 0,
+  total_carbs double precision not null default 0,
+  total_fat double precision not null default 0,
+  logged_date date not null,
+  created_at timestamptz not null default now()
 );
 
--- Workout log
-CREATE TABLE IF NOT EXISTS workout_log (
-    id          INT AUTO_INCREMENT PRIMARY KEY,
-    user_id     INT NOT NULL,
-    activity    VARCHAR(100) NOT NULL,
-    duration    VARCHAR(50) NOT NULL,
-    description TEXT,
-    logged_date DATE NOT NULL,
-    logged_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users_auth(id) ON DELETE CASCADE
+create table if not exists workout_log (
+  id bigserial primary key,
+  user_id bigint not null references users_auth(id) on delete cascade,
+  activity varchar(100) not null,
+  duration varchar(50) not null,
+  description text,
+  logged_date date not null,
+  created_at timestamptz not null default now()
 );
 
--- Daily budget overrides
-CREATE TABLE IF NOT EXISTS daily_budget (
-    id          INT AUTO_INCREMENT PRIMARY KEY,
-    user_id     INT NOT NULL,
-    budget_date DATE NOT NULL,
-    amount      FLOAT NOT NULL,
-    UNIQUE KEY unique_user_date (user_id, budget_date),
-    FOREIGN KEY (user_id) REFERENCES users_auth(id) ON DELETE CASCADE
+create table if not exists daily_budget (
+  id bigserial primary key,
+  user_id bigint not null references users_auth(id) on delete cascade,
+  budget_date date not null,
+  amount double precision not null,
+  constraint unique_user_date unique (user_id, budget_date)
 );
+
+create table if not exists receipt_scans (
+  id bigserial primary key,
+  user_id bigint not null references users_auth(id) on delete cascade,
+  scanned_text text not null,
+  extracted_total double precision not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists challenges (
+  id bigserial primary key,
+  title varchar(120) not null,
+  description text not null default '',
+  target_budget double precision not null,
+  duration_days integer not null default 7,
+  created_by bigint not null references users_auth(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists challenge_members (
+  id bigserial primary key,
+  challenge_id bigint not null references challenges(id) on delete cascade,
+  user_id bigint not null references users_auth(id) on delete cascade,
+  joined_at timestamptz not null default now(),
+  constraint unique_challenge_user unique (challenge_id, user_id)
+);
+
+create index if not exists idx_meals_log_user_date on meals_log(user_id, logged_date);
+create index if not exists idx_workout_log_user_date on workout_log(user_id, logged_date);
+create index if not exists idx_daily_budget_user_date on daily_budget(user_id, budget_date);

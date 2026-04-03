@@ -7,7 +7,13 @@ protein needs, and user goal.
 """
 
 
-def get_recommendations(calories_remaining, budget_remaining, user_goal, food_items, protein_consumed=0):
+async def get_recommendations(
+    calories_remaining: int,
+    budget_remaining: float,
+    user_goal: str,
+    food_items: list[dict],
+    protein_consumed: float = 0,
+) -> dict:
     """
     Main entry point. Returns meal suggestions, workout suggestion, and status.
 

@@ -1,28 +1,35 @@
-import { useState } from 'react';
+import { useMemo } from 'react';
+import { useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
 
 /**
  * Signup — Full registration form with profile data.
  */
 export default function Signup({ onSignup, isLoading, error }) {
-  const [form, setForm] = useState({
-    name: '',
-    username: '',
-    password: '',
-    height_cm: '',
-    weight_kg: '',
-    age: '',
-    goal: 'maintain',
-    target_weight: '',
-    default_budget: '',
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { isValid },
+  } = useForm({
+    mode: 'onChange',
+    defaultValues: {
+      name: '',
+      username: '',
+      password: '',
+      height_cm: '',
+      weight_kg: '',
+      age: '',
+      goal: 'maintain',
+      target_weight: '',
+      default_budget: '',
+    },
   });
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+  const goal = watch('goal');
+  const showTargetWeight = goal === 'lose' || goal === 'gain';
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const onSubmit = (form) => {
     const data = {
       name: form.name.trim(),
       username: form.username.trim(),
@@ -39,9 +46,7 @@ export default function Signup({ onSignup, isLoading, error }) {
     onSignup(data);
   };
 
-  const showTargetWeight = form.goal === 'lose' || form.goal === 'gain';
-  const isValid = form.name && form.username && form.password && form.height_cm
-    && form.weight_kg && form.age && form.default_budget;
+  const budgetMin = useMemo(() => 50, []);
 
   return (
     <div className="auth-container">
@@ -67,7 +72,7 @@ export default function Signup({ onSignup, isLoading, error }) {
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {/* Name & Username */}
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -77,11 +82,9 @@ export default function Signup({ onSignup, isLoading, error }) {
               <input
                 type="text"
                 name="name"
-                value={form.name}
-                onChange={handleChange}
                 placeholder="John Doe"
                 className="input-field"
-                required
+                {...register('name', { required: true })}
                 id="input-signup-name"
               />
             </div>
@@ -92,11 +95,9 @@ export default function Signup({ onSignup, isLoading, error }) {
               <input
                 type="text"
                 name="username"
-                value={form.username}
-                onChange={handleChange}
                 placeholder="johndoe"
                 className="input-field"
-                required
+                {...register('username', { required: true })}
                 id="input-signup-username"
               />
             </div>
@@ -110,12 +111,9 @@ export default function Signup({ onSignup, isLoading, error }) {
             <input
               type="password"
               name="password"
-              value={form.password}
-              onChange={handleChange}
               placeholder="Min 4 characters"
               className="input-field"
-              minLength={4}
-              required
+              {...register('password', { required: true, minLength: 4 })}
               id="input-signup-password"
             />
           </div>
@@ -129,13 +127,9 @@ export default function Signup({ onSignup, isLoading, error }) {
               <input
                 type="number"
                 name="height_cm"
-                value={form.height_cm}
-                onChange={handleChange}
                 placeholder="170"
                 className="input-field"
-                min="100"
-                max="250"
-                required
+                {...register('height_cm', { required: true, min: 100, max: 250 })}
                 id="input-signup-height"
               />
             </div>
@@ -146,13 +140,9 @@ export default function Signup({ onSignup, isLoading, error }) {
               <input
                 type="number"
                 name="weight_kg"
-                value={form.weight_kg}
-                onChange={handleChange}
                 placeholder="70"
                 className="input-field"
-                min="30"
-                max="300"
-                required
+                {...register('weight_kg', { required: true, min: 30, max: 300 })}
                 id="input-signup-weight"
               />
             </div>
@@ -166,13 +156,9 @@ export default function Signup({ onSignup, isLoading, error }) {
             <input
               type="number"
               name="age"
-              value={form.age}
-              onChange={handleChange}
               placeholder="25"
               className="input-field"
-              min="10"
-              max="120"
-              required
+              {...register('age', { required: true, min: 10, max: 120 })}
               id="input-signup-age"
             />
           </div>
@@ -184,9 +170,8 @@ export default function Signup({ onSignup, isLoading, error }) {
             </label>
             <select
               name="goal"
-              value={form.goal}
-              onChange={handleChange}
               className="input-field"
+              {...register('goal', { required: true })}
               id="select-signup-goal"
             >
               <option value="lose">🔥 Lose Weight</option>
@@ -204,12 +189,9 @@ export default function Signup({ onSignup, isLoading, error }) {
               <input
                 type="number"
                 name="target_weight"
-                value={form.target_weight}
-                onChange={handleChange}
-                placeholder={form.goal === 'lose' ? '65' : '80'}
+                placeholder={goal === 'lose' ? '65' : '80'}
                 className="input-field"
-                min="30"
-                max="300"
+                {...register('target_weight', { min: 30, max: 300 })}
                 id="input-signup-target-weight"
               />
             </div>
@@ -223,12 +205,9 @@ export default function Signup({ onSignup, isLoading, error }) {
             <input
               type="number"
               name="default_budget"
-              value={form.default_budget}
-              onChange={handleChange}
               placeholder="500"
               className="input-field"
-              min="50"
-              required
+              {...register('default_budget', { required: true, min: budgetMin })}
               id="input-signup-budget"
             />
           </div>

@@ -1,130 +1,123 @@
-import { useState, useEffect, useCallback } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import Sidebar from './components/Sidebar';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Login from './components/Login';
 import Signup from './components/Signup';
-import Dashboard from './components/Dashboard';
-import Profile from './components/Profile';
-import WeeklyReport from './components/WeeklyReport';
+import useAuthStore from './store/authStore';
 import {
   getMe, login as apiLogin, signup as apiSignup, logout as apiLogout,
   getDashboard, getFoodItems, logMeal,
 } from './api';
 import './index.css';
 
+const Sidebar = lazy(() => import('./components/Sidebar'));
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const Profile = lazy(() => import('./components/Profile'));
+const WeeklyReport = lazy(() => import('./components/WeeklyReport'));
+
 /**
  * App — Root component with auth, routing, and layout.
  */
 export default function App() {
-  const [user, setUser] = useState(null);
-  const [authChecked, setAuthChecked] = useState(false);
-  const [authLoading, setAuthLoading] = useState(false);
-  const [authError, setAuthError] = useState(null);
-  const [dashboardData, setDashboardData] = useState(null);
-  const [foodItems, setFoodItems] = useState([]);
-  const [isLogging, setIsLogging] = useState(false);
+  const user = useAuthStore((state) => state.user);
+  const setUser = useAuthStore((state) => state.setUser);
+  const clearUser = useAuthStore((state) => state.clearUser);
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // ── Check existing session on mount ──
+  const meQuery = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: getMe,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
   useEffect(() => {
-    checkSession();
-  }, []);
-
-  const checkSession = async () => {
-    try {
-      const data = await getMe();
-      if (data.authenticated) {
-        setUser(data.user);
-      }
-    } catch {
-      // Not authenticated — that's fine
-    } finally {
-      setAuthChecked(true);
+    if (meQuery.data?.authenticated) {
+      setUser(meQuery.data.user);
+    } else if (meQuery.isSuccess) {
+      clearUser();
     }
-  };
+  }, [meQuery.data, meQuery.isSuccess, setUser, clearUser]);
 
-  // ── Load dashboard + food items when user is set ──
-  useEffect(() => {
-    if (user) {
-      loadDashboard();
-      loadFoodItems();
-    }
-  }, [user]);
+  const dashboardQuery = useQuery({
+    queryKey: ['dashboard'],
+    queryFn: getDashboard,
+    enabled: !!user,
+  });
 
-  const loadDashboard = useCallback(async () => {
-    try {
-      const data = await getDashboard();
-      setDashboardData(data);
-    } catch (err) {
-      console.error('Dashboard load error:', err);
-    }
-  }, []);
-
-  const loadFoodItems = async () => {
-    try {
-      const data = await getFoodItems();
-      setFoodItems(data.food_items || []);
-    } catch (err) {
-      console.error('Food items load error:', err);
-    }
-  };
+  const foodItemsQuery = useQuery({
+    queryKey: ['food-items'],
+    queryFn: getFoodItems,
+    enabled: !!user,
+    select: (data) => data.food_items || [],
+  });
 
   // ── Auth handlers ──
-  const handleLogin = async (username, password) => {
-    setAuthLoading(true);
-    setAuthError(null);
-    try {
-      const result = await apiLogin(username, password);
+  const loginMutation = useMutation({
+    mutationFn: ({ username, password }) => apiLogin(username, password),
+    onSuccess: (result) => {
       setUser(result.user);
+      queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['food-items'] });
       navigate('/dashboard');
-    } catch (err) {
-      setAuthError(err.message);
-    } finally {
-      setAuthLoading(false);
-    }
+    },
+  });
+
+  const signupMutation = useMutation({
+    mutationFn: (userData) => apiSignup(userData),
+    onSuccess: (result) => {
+      setUser(result.user);
+      queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['food-items'] });
+      navigate('/dashboard');
+    },
+  });
+
+  const logoutMutation = useMutation({
+    mutationFn: apiLogout,
+    onSettled: () => {
+      clearUser();
+      queryClient.removeQueries({ queryKey: ['dashboard'] });
+      queryClient.removeQueries({ queryKey: ['food-items'] });
+      navigate('/login');
+    },
+  });
+
+  const mealMutation = useMutation({
+    mutationFn: ({ mealType, items }) => logMeal(mealType, items),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+
+  const handleLogin = async (username, password) => {
+    await loginMutation.mutateAsync({ username, password });
   };
 
   const handleSignup = async (userData) => {
-    setAuthLoading(true);
-    setAuthError(null);
-    try {
-      const result = await apiSignup(userData);
-      setUser(result.user);
-      navigate('/dashboard');
-    } catch (err) {
-      setAuthError(err.message);
-    } finally {
-      setAuthLoading(false);
-    }
+    await signupMutation.mutateAsync(userData);
   };
 
   const handleLogout = async () => {
-    try {
-      await apiLogout();
-    } catch {
-      // Logout anyway
-    }
-    setUser(null);
-    setDashboardData(null);
-    setFoodItems([]);
-    navigate('/login');
+    await logoutMutation.mutateAsync();
   };
 
   // ── Meal logging ──
   const handleLogMeal = async (mealType, items) => {
-    setIsLogging(true);
-    try {
-      await logMeal(mealType, items);
-      await loadDashboard();
-    } catch (err) {
-      console.error('Meal log error:', err);
-    } finally {
-      setIsLogging(false);
-    }
+    await mealMutation.mutateAsync({ mealType, items });
   };
 
+  const routeLoadingFallback = (
+    <div className="flex items-center justify-center h-64">
+      <p className="text-slate-500">Loading section...</p>
+    </div>
+  );
+
   // ── Loading screen while checking session ──
-  if (!authChecked) {
+  if (meQuery.isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -139,6 +132,9 @@ export default function App() {
 
   // ── Not authenticated → show login/signup ──
   if (!user) {
+    const authError = loginMutation.error?.message || signupMutation.error?.message || null;
+    const authLoading = loginMutation.isPending || signupMutation.isPending;
+
     return (
       <Routes>
         <Route path="/login" element={<Login onLogin={handleLogin} isLoading={authLoading} error={authError} />} />
@@ -151,27 +147,31 @@ export default function App() {
   // ── Authenticated → sidebar layout with routes ──
   return (
     <div className="flex min-h-screen">
-      <Sidebar user={user} onLogout={handleLogout} />
+      <Suspense fallback={routeLoadingFallback}>
+        <Sidebar onLogout={handleLogout} />
+      </Suspense>
 
       <div className="main-content">
         <div className="max-w-6xl mx-auto px-4 py-4 sm:px-6 sm:py-6">
-          <Routes>
-            <Route
-              path="/dashboard"
-              element={
-                <Dashboard
-                  data={dashboardData}
-                  foodItems={foodItems}
-                  onRefresh={loadDashboard}
-                  onLogMeal={handleLogMeal}
-                  isLogging={isLogging}
-                />
-              }
-            />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/weekly-report" element={<WeeklyReport />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
+          <Suspense fallback={routeLoadingFallback}>
+            <Routes>
+              <Route
+                path="/dashboard"
+                element={
+                  <Dashboard
+                    data={dashboardQuery.data}
+                    foodItems={foodItemsQuery.data || []}
+                    onRefresh={() => queryClient.invalidateQueries({ queryKey: ['dashboard'] })}
+                    onLogMeal={handleLogMeal}
+                    isLogging={mealMutation.isPending}
+                  />
+                }
+              />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/weekly-report" element={<WeeklyReport />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </Suspense>
         </div>
       </div>
     </div>

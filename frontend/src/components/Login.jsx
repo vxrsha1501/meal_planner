@@ -1,16 +1,21 @@
-import { useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
 
 /**
  * Login — Username + password form with link to signup.
  */
 export default function Login({ onLogin, isLoading, error }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const {
+    register,
+    handleSubmit,
+    formState: { isValid },
+  } = useForm({
+    mode: 'onChange',
+    defaultValues: { username: '', password: '' },
+  });
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onLogin(username.trim(), password);
+  const onSubmit = (values) => {
+    onLogin(values.username.trim(), values.password);
   };
 
   return (
@@ -37,18 +42,16 @@ export default function Login({ onLogin, isLoading, error }) {
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           <div>
             <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">
               Username
             </label>
             <input
               type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
               placeholder="Enter username"
               className="input-field"
-              required
+              {...register('username', { required: true })}
               id="input-login-username"
             />
           </div>
@@ -59,18 +62,16 @@ export default function Login({ onLogin, isLoading, error }) {
             </label>
             <input
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password"
               className="input-field"
-              required
+              {...register('password', { required: true })}
               id="input-login-password"
             />
           </div>
 
           <button
             type="submit"
-            disabled={!username || !password || isLoading}
+            disabled={!isValid || isLoading}
             className="btn-primary w-full text-center mt-6"
             id="btn-login"
           >

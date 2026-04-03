@@ -1,6 +1,6 @@
 /**
- * API utility — handles all communication with the Flask backend.
- * Uses the Vite proxy (/api → http://localhost:5000) in dev mode.
+ * API utility — handles all communication with the FastAPI backend.
+ * Uses the Vite proxy (/api → http://localhost:8000) in dev mode.
  * All requests include credentials for session cookies.
  */
 
@@ -21,7 +21,7 @@ async function request(endpoint, options = {}) {
   try {
     response = await fetch(url, config);
   } catch (err) {
-    throw new Error('Cannot reach the backend server. Is Flask running on port 5000?');
+    throw new Error('Cannot reach the backend server. Is FastAPI running on port 8000?');
   }
 
   let data;
@@ -31,14 +31,29 @@ async function request(endpoint, options = {}) {
   } catch {
     throw new Error(
       `Backend returned non-JSON response (status ${response.status}). ` +
-      'Make sure the Flask server is running.'
+      'Make sure the FastAPI server is running.'
     );
   }
 
   if (!response.ok) {
-    throw new Error(data.error || `Request failed with status ${response.status}`);
+    throw new Error(data.error || data.detail || `Request failed with status ${response.status}`);
   }
 
+  return data;
+}
+
+async function uploadRequest(endpoint, formData) {
+  const url = `${BASE_URL}${endpoint}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || data.detail || `Request failed with status ${response.status}`);
+  }
   return data;
 }
 
@@ -129,4 +144,42 @@ export async function logWorkout(activity, duration, description) {
 
 export async function getWeeklyReport() {
   return request('/weekly-report');
+}
+
+// ── AI & OCR ──
+
+export async function askMealAssistant(query) {
+  return request('/ai/meal-query', {
+    method: 'POST',
+    body: JSON.stringify({ query }),
+  });
+}
+
+export async function scanReceipt(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  return uploadRequest('/receipt/scan', formData);
+}
+
+// ── Challenges ──
+
+export async function createChallenge(payload) {
+  return request('/challenges', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getChallenges() {
+  return request('/challenges');
+}
+
+export async function joinChallenge(challengeId) {
+  return request(`/challenges/${challengeId}/join`, {
+    method: 'POST',
+  });
+}
+
+export async function getMyChallenges() {
+  return request('/challenges/me');
 }
