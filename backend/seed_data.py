@@ -1,30 +1,30 @@
 """
 Predefined food dataset for the Lifestyle Planner.
-Each item has: calories (per serving), cost (per serving), and category.
+Each item has: calories (per serving), cost (per serving), protein (g), and category.
 This data is seeded into the database on first run.
 """
 
 FOOD_ITEMS = [
-    {"name": "Egg",                    "calories": 70,  "cost": 10,  "category": "protein"},
-    {"name": "Rice (1 cup)",           "calories": 200, "cost": 20,  "category": "carbs"},
-    {"name": "Paneer (100g)",          "calories": 300, "cost": 80,  "category": "protein"},
-    {"name": "Chicken Breast (100g)",  "calories": 165, "cost": 120, "category": "protein"},
-    {"name": "Dal (1 cup)",            "calories": 150, "cost": 30,  "category": "protein"},
-    {"name": "Roti",                   "calories": 120, "cost": 10,  "category": "carbs"},
-    {"name": "Banana",                 "calories": 90,  "cost": 5,   "category": "fruit"},
-    {"name": "Apple",                  "calories": 95,  "cost": 30,  "category": "fruit"},
-    {"name": "Milk (1 glass)",         "calories": 150, "cost": 25,  "category": "dairy"},
-    {"name": "Oats (1 cup)",           "calories": 180, "cost": 15,  "category": "carbs"},
-    {"name": "Salad Bowl",             "calories": 50,  "cost": 40,  "category": "vegetable"},
-    {"name": "Bread (1 slice)",        "calories": 80,  "cost": 5,   "category": "carbs"},
-    {"name": "Yogurt (1 cup)",         "calories": 100, "cost": 20,  "category": "dairy"},
-    {"name": "Peanut Butter (2 tbsp)", "calories": 190, "cost": 35,  "category": "fat"},
-    {"name": "Pasta (1 cup)",          "calories": 220, "cost": 25,  "category": "carbs"},
-    {"name": "Tofu (100g)",            "calories": 80,  "cost": 50,  "category": "protein"},
-    {"name": "Sweet Potato",           "calories": 100, "cost": 15,  "category": "carbs"},
-    {"name": "Fish (100g)",            "calories": 130, "cost": 100, "category": "protein"},
-    {"name": "Cheese (1 slice)",       "calories": 110, "cost": 45,  "category": "dairy"},
-    {"name": "Protein Shake",          "calories": 250, "cost": 60,  "category": "protein"},
+    {"name": "Egg",                    "calories": 70,  "cost": 10,  "protein": 6,  "category": "protein"},
+    {"name": "Rice (1 cup)",           "calories": 200, "cost": 20,  "protein": 4,  "category": "carbs"},
+    {"name": "Paneer (100g)",          "calories": 300, "cost": 80,  "protein": 20, "category": "protein"},
+    {"name": "Chicken Breast (100g)",  "calories": 165, "cost": 120, "protein": 31, "category": "protein"},
+    {"name": "Dal (1 cup)",            "calories": 150, "cost": 30,  "protein": 9,  "category": "protein"},
+    {"name": "Roti",                   "calories": 120, "cost": 10,  "protein": 3,  "category": "carbs"},
+    {"name": "Banana",                 "calories": 90,  "cost": 5,   "protein": 1,  "category": "fruit"},
+    {"name": "Apple",                  "calories": 95,  "cost": 30,  "protein": 0,  "category": "fruit"},
+    {"name": "Milk (1 glass)",         "calories": 150, "cost": 25,  "protein": 8,  "category": "dairy"},
+    {"name": "Oats (1 cup)",           "calories": 180, "cost": 15,  "protein": 6,  "category": "carbs"},
+    {"name": "Salad Bowl",             "calories": 50,  "cost": 40,  "protein": 2,  "category": "vegetable"},
+    {"name": "Bread (1 slice)",        "calories": 80,  "cost": 5,   "protein": 3,  "category": "carbs"},
+    {"name": "Yogurt (1 cup)",         "calories": 100, "cost": 20,  "protein": 10, "category": "dairy"},
+    {"name": "Peanut Butter (2 tbsp)", "calories": 190, "cost": 35,  "protein": 7,  "category": "fat"},
+    {"name": "Pasta (1 cup)",          "calories": 220, "cost": 25,  "protein": 8,  "category": "carbs"},
+    {"name": "Tofu (100g)",            "calories": 80,  "cost": 50,  "protein": 8,  "category": "protein"},
+    {"name": "Sweet Potato",           "calories": 100, "cost": 15,  "protein": 2,  "category": "carbs"},
+    {"name": "Fish (100g)",            "calories": 130, "cost": 100, "protein": 26, "category": "protein"},
+    {"name": "Cheese (1 slice)",       "calories": 110, "cost": 45,  "protein": 7,  "category": "dairy"},
+    {"name": "Protein Shake",          "calories": 250, "cost": 60,  "protein": 30, "category": "protein"},
 ]
 
 
@@ -42,6 +42,7 @@ def seed_food_items(db, FoodItem):
                 name=item["name"],
                 calories=item["calories"],
                 cost=item["cost"],
+                protein=item["protein"],
                 category=item["category"],
             )
             db.session.add(food)
