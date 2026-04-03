@@ -1,190 +1,178 @@
 import { useState, useEffect, useCallback } from 'react';
-import ProfileForm from './components/ProfileForm';
-import MealLogger from './components/MealLogger';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import Sidebar from './components/Sidebar';
+import Login from './components/Login';
+import Signup from './components/Signup';
 import Dashboard from './components/Dashboard';
-import SuggestionsCard from './components/SuggestionsCard';
-import { setupUser, logMeal, getDashboard, getFoodItems, resetDaily } from './api';
+import Profile from './components/Profile';
+import WeeklyReport from './components/WeeklyReport';
+import {
+  getMe, login as apiLogin, signup as apiSignup, logout as apiLogout,
+  getDashboard, getFoodItems, logMeal,
+} from './api';
 import './index.css';
 
 /**
- * App — Root component orchestrating the full workflow:
- *   1. Profile setup (if no user)
- *   2. Dashboard + Meal Logger + Suggestions (after setup)
- *
- * State is lifted here and passed down to child components.
+ * App — Root component with auth, routing, and layout.
  */
 export default function App() {
-  // ── State ──
-  const [userId, setUserId] = useState(null);
-  const [foodItems, setFoodItems] = useState([]);
+  const [user, setUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState(null);
   const [dashboardData, setDashboardData] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [foodItems, setFoodItems] = useState([]);
   const [isLogging, setIsLogging] = useState(false);
-  const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
-  // ── Fetch dashboard data ──
-  const refreshDashboard = useCallback(async (uid) => {
-    try {
-      const data = await getDashboard(uid);
-      setDashboardData(data);
-      setError(null);
-    } catch (err) {
-      setError(err.message);
-    }
-  }, []);
-
-  // ── Load food items on mount ──
+  // ── Check existing session on mount ──
   useEffect(() => {
-    async function loadFoodItems() {
-      try {
-        const data = await getFoodItems();
-        setFoodItems(data.food_items || []);
-      } catch (err) {
-        console.error('Failed to load food items:', err);
-        // Backend might not be running yet — fail silently
-      }
-    }
-    loadFoodItems();
+    checkSession();
   }, []);
 
-  // ── Profile setup handler ──
-  const handleProfileSubmit = async (profile) => {
-    setIsLoading(true);
-    setError(null);
+  const checkSession = async () => {
     try {
-      const result = await setupUser(profile);
-      setUserId(result.user_id);
-      await refreshDashboard(result.user_id);
-    } catch (err) {
-      setError(err.message);
+      const data = await getMe();
+      if (data.authenticated) {
+        setUser(data.user);
+      }
+    } catch {
+      // Not authenticated — that's fine
     } finally {
-      setIsLoading(false);
+      setAuthChecked(true);
     }
   };
 
-  // ── Meal log handler ──
-  const handleLogMeal = async (foodItem, quantity) => {
-    if (!userId) return;
-    setIsLogging(true);
-    setError(null);
+  // ── Load dashboard + food items when user is set ──
+  useEffect(() => {
+    if (user) {
+      loadDashboard();
+      loadFoodItems();
+    }
+  }, [user]);
+
+  const loadDashboard = useCallback(async () => {
     try {
-      await logMeal(userId, foodItem, quantity);
-      // Refresh dashboard to get updated totals + new recommendations
-      await refreshDashboard(userId);
+      const data = await getDashboard();
+      setDashboardData(data);
     } catch (err) {
-      setError(err.message);
+      console.error('Dashboard load error:', err);
+    }
+  }, []);
+
+  const loadFoodItems = async () => {
+    try {
+      const data = await getFoodItems();
+      setFoodItems(data.food_items || []);
+    } catch (err) {
+      console.error('Food items load error:', err);
+    }
+  };
+
+  // ── Auth handlers ──
+  const handleLogin = async (username, password) => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const result = await apiLogin(username, password);
+      setUser(result.user);
+      navigate('/dashboard');
+    } catch (err) {
+      setAuthError(err.message);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSignup = async (userData) => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const result = await apiSignup(userData);
+      setUser(result.user);
+      navigate('/dashboard');
+    } catch (err) {
+      setAuthError(err.message);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await apiLogout();
+    } catch {
+      // Logout anyway
+    }
+    setUser(null);
+    setDashboardData(null);
+    setFoodItems([]);
+    navigate('/login');
+  };
+
+  // ── Meal logging ──
+  const handleLogMeal = async (mealType, items) => {
+    setIsLogging(true);
+    try {
+      await logMeal(mealType, items);
+      await loadDashboard();
+    } catch (err) {
+      console.error('Meal log error:', err);
     } finally {
       setIsLogging(false);
     }
   };
 
-  // ── Reset daily counters ──
-  const handleReset = async () => {
-    if (!userId) return;
-    try {
-      await resetDaily(userId);
-      await refreshDashboard(userId);
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  // ── Back to setup ──
-  const handleBackToSetup = () => {
-    setUserId(null);
-    setDashboardData(null);
-    setError(null);
-  };
-
-  // ── Render ──
-
-  // Show profile form if no user
-  if (!userId) {
+  // ── Loading screen while checking session ──
+  if (!authChecked) {
     return (
-      <>
-        <ProfileForm onSubmit={handleProfileSubmit} isLoading={isLoading} />
-        {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
-      </>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-2xl mx-auto mb-4 animate-pulse-glow">
+            🧠
+          </div>
+          <p className="text-sm text-slate-500">Loading...</p>
+        </div>
+      </div>
     );
   }
 
-  // Main dashboard view
+  // ── Not authenticated → show login/signup ──
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login onLogin={handleLogin} isLoading={authLoading} error={authError} />} />
+        <Route path="/signup" element={<Signup onSignup={handleSignup} isLoading={authLoading} error={authError} />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
+
+  // ── Authenticated → sidebar layout with routes ──
   return (
-    <div className="min-h-screen">
-      {/* Top Navigation */}
-      <header className="sticky top-0 z-50 border-b border-white/5 bg-dark-900/80 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-lg">
-              🧠
-            </div>
-            <h1 className="text-lg font-bold gradient-text hidden sm:block">
-              Lifestyle Planner
-            </h1>
-          </div>
-          <button onClick={handleBackToSetup} className="btn-secondary text-xs" id="btn-new-profile">
-            ← New Profile
-          </button>
-        </div>
-      </header>
+    <div className="flex min-h-screen">
+      <Sidebar user={user} onLogout={handleLogout} />
 
-      {/* Error Banner */}
-      {error && <ErrorBanner message={error} onDismiss={() => setError(null)} />}
-
-      {/* Main Content Grid */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Column: Meal Logger */}
-          <div className="lg:col-span-4 space-y-6">
-            <MealLogger
-              foodItems={foodItems}
-              onLog={handleLogMeal}
-              isLogging={isLogging}
+      <div className="main-content">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <Routes>
+            <Route
+              path="/dashboard"
+              element={
+                <Dashboard
+                  data={dashboardData}
+                  foodItems={foodItems}
+                  onRefresh={loadDashboard}
+                  onLogMeal={handleLogMeal}
+                  isLogging={isLogging}
+                />
+              }
             />
-          </div>
-
-          {/* Middle Column: Dashboard */}
-          <div className="lg:col-span-4 space-y-6">
-            <Dashboard
-              data={dashboardData}
-              onReset={handleReset}
-            />
-          </div>
-
-          {/* Right Column: Suggestions */}
-          <div className="lg:col-span-4 space-y-6">
-            <SuggestionsCard
-              recommendations={dashboardData?.recommendations}
-            />
-          </div>
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/weekly-report" element={<WeeklyReport />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
         </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-white/5 mt-12 py-6">
-        <p className="text-center text-xs text-slate-600">
-          AI Budget-Aware Lifestyle Planner · Built for Hackathon 2026
-        </p>
-      </footer>
-    </div>
-  );
-}
-
-/* ── Error Banner ── */
-function ErrorBanner({ message, onDismiss }) {
-  return (
-    <div className="fixed top-4 right-4 z-[100] max-w-sm animate-fade-in-up">
-      <div className="bg-rose-500/15 border border-rose-500/30 backdrop-blur-lg rounded-xl p-4 flex items-start gap-3">
-        <span className="text-rose-400 text-lg">⚠️</span>
-        <div className="flex-1">
-          <p className="text-sm text-rose-300">{message}</p>
-        </div>
-        <button
-          onClick={onDismiss}
-          className="text-rose-400 hover:text-rose-300 text-lg leading-none"
-        >
-          ×
-        </button>
       </div>
     </div>
   );
