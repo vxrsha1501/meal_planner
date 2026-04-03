@@ -155,6 +155,19 @@ export async function askMealAssistant(query) {
   });
 }
 
+export async function getWorkoutPlan(workoutPreference, notes = '') {
+  return request('/ai/workout-plan', {
+    method: 'POST',
+    body: JSON.stringify({ workout_preference: workoutPreference, notes }),
+  });
+}
+
+export async function scanMealImage(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  return uploadRequest('/ai/meal-scan', formData);
+}
+
 export async function scanReceipt(file) {
   const formData = new FormData();
   formData.append('file', file);

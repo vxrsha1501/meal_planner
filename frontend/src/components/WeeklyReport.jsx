@@ -1,13 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
-import { getWeeklyReport } from '../api';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend,
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from 'recharts';
+import { getWeeklyReport } from '../api';
 
-/**
- * WeeklyReport — Bar chart for last 7 days + workout summary.
- */
 export default function WeeklyReport() {
   const { data: report, isLoading: loading } = useQuery({
     queryKey: ['weekly-report'],
@@ -16,148 +19,100 @@ export default function WeeklyReport() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-slate-500">Loading report...</p>
+      <div className="bento-skeleton-grid">
+        <div className="bento-skeleton tile-span-12" />
+        <div className="bento-skeleton tile-span-6" />
+        <div className="bento-skeleton tile-span-6" />
       </div>
     );
   }
 
   if (!report) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-rose-400">Could not load weekly report</p>
+      <div className="glass-card rounded-[var(--radius-bento)] p-6">
+        <p className="text-rose-400">Could not load weekly report.</p>
       </div>
     );
   }
 
   const { days, calorie_target } = report;
-
-  // Prepare chart data
   const chartData = days.map((d) => ({
     day: d.day,
-    Calories: d.calories,
-    Protein: d.protein,
-    Cost: d.cost,
-    Target: calorie_target,
+    calories: d.calories,
+    budget: d.cost,
+    protein: d.protein,
+    workouts: d.workouts.length,
   }));
 
-  // Custom tooltip
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (!active || !payload?.length) return null;
-    return (
-      <div className="glass-card p-3 text-xs space-y-1 border border-white/10">
-        <p className="font-semibold text-white">{label}</p>
-        {payload.map((entry, i) => (
-          <p key={i} style={{ color: entry.color }}>
-            {entry.name}: {entry.name === 'Cost' ? `₹${entry.value}` : entry.value}
-          </p>
-        ))}
-      </div>
-    );
-  };
-
-  // Calculate weekly totals
   const totalCal = days.reduce((s, d) => s + d.calories, 0);
   const totalProtein = days.reduce((s, d) => s + d.protein, 0);
   const totalCost = days.reduce((s, d) => s + d.cost, 0);
-  const totalWorkouts = days.reduce((s, d) => s + d.workouts.length, 0);
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      <h1 className="text-2xl font-bold text-white">Weekly Report</h1>
+      <header>
+        <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">Analytics Suite</p>
+        <h1 className="text-3xl font-black text-white">Weekly Performance Graph</h1>
+      </header>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <SummaryCard icon="🔥" label="Total Calories" value={totalCal.toLocaleString()} gradient="from-amber-500 to-orange-500" />
-        <SummaryCard icon="🥩" label="Total Protein" value={`${totalProtein}g`} gradient="from-emerald-500 to-teal-500" />
-        <SummaryCard icon="💰" label="Total Spent" value={`₹${totalCost}`} gradient="from-violet-500 to-purple-500" />
-        <SummaryCard icon="🏋️" label="Workouts" value={totalWorkouts} gradient="from-cyan-500 to-blue-500" />
+        <SummaryCard label="Calories" value={totalCal.toLocaleString()} tone="emerald" />
+        <SummaryCard label="Protein" value={`${totalProtein}g`} tone="lavender" />
+        <SummaryCard label="Spend" value={`₹${totalCost}`} tone="amber" />
+        <SummaryCard label="Daily Target" value={`${calorie_target} cal`} tone="emerald" />
       </div>
 
-      {/* Calories Chart */}
-      <div className="glass-card p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">📊 Daily Calories (Last 7 Days)</h2>
-        <div style={{ width: '100%', height: 300 }}>
+      <div className="glass-card rounded-[var(--radius-bento)] border border-white/10 p-6">
+        <h2 className="text-lg font-semibold text-white mb-4">Gradient Area Splines: Calories vs Budget</h2>
+        <div style={{ width: '100%', height: 320 }}>
           <ResponsiveContainer>
-            <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="day" />
-              <YAxis />
-              <Tooltip content={<CustomTooltip />} />
+            <AreaChart data={chartData} margin={{ top: 6, right: 12, left: -8, bottom: 0 }}>
+              <defs>
+                <linearGradient id="calGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10B981" stopOpacity={0.8} />
+                  <stop offset="95%" stopColor="#10B981" stopOpacity={0.05} />
+                </linearGradient>
+                <linearGradient id="budgetGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.85} />
+                  <stop offset="95%" stopColor="#F59E0B" stopOpacity={0.05} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.2)" />
+              <XAxis dataKey="day" stroke="rgba(148,163,184,0.9)" />
+              <YAxis stroke="rgba(148,163,184,0.9)" />
+              <Tooltip contentStyle={{ background: 'rgba(15,23,42,0.92)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px' }} />
               <Legend />
-              <Bar dataKey="Calories" fill="#10b981" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Protein" fill="#06b6d4" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        {calorie_target > 0 && (
-          <p className="text-xs text-slate-500 mt-2 text-center">
-            Daily target: {calorie_target} cal
-          </p>
-        )}
-      </div>
-
-      {/* Spending Chart */}
-      <div className="glass-card p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">💰 Daily Spending (Last 7 Days)</h2>
-        <div style={{ width: '100%', height: 250 }}>
-          <ResponsiveContainer>
-            <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="day" />
-              <YAxis />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="Cost" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-            </BarChart>
+              <Area type="monotone" dataKey="calories" stroke="#10B981" fill="url(#calGrad)" strokeWidth={2.5} />
+              <Area type="monotone" dataKey="budget" stroke="#F59E0B" fill="url(#budgetGrad)" strokeWidth={2.5} />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Workouts per Day */}
-      <div className="glass-card p-6">
-        <h2 className="text-lg font-semibold text-white mb-4">🏋️ Workouts Per Day</h2>
-        <div className="space-y-3">
-          {days.map((day, idx) => (
-            <div key={idx} className="flex items-start gap-4 py-2.5 px-3 rounded-lg bg-white/[0.03]">
-              <div className="w-12 text-center">
-                <p className="text-sm font-bold text-white">{day.day}</p>
-                <p className="text-[10px] text-slate-500">{day.date.slice(5)}</p>
+      <div className="glass-card rounded-[var(--radius-bento)] border border-white/10 p-6">
+        <h2 className="text-lg font-semibold text-white mb-4">Workout Intensity Heatmap</h2>
+        <div className="grid grid-cols-7 gap-2">
+          {days.map((day, idx) => {
+            const intensity = Math.min(4, day.workouts.length + (day.calories > calorie_target ? 1 : 0));
+            return (
+              <div key={idx} className="text-center">
+                <div className={`heatmap-cell intensity-${intensity}`} />
+                <p className="mt-1 text-[11px] text-[var(--text-muted)]">{day.day}</p>
               </div>
-              <div className="flex-1">
-                {day.workouts.length > 0 ? (
-                  day.workouts.map((w, i) => (
-                    <div key={i} className="flex items-center gap-2 text-sm">
-                      <span className="text-emerald-400 font-medium">{w.activity}</span>
-                      <span className="text-slate-500">·</span>
-                      <span className="text-slate-400">{w.duration}</span>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-xs text-slate-600 italic">No workout logged</p>
-                )}
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-slate-400">{day.calories} cal</p>
-                <p className="text-xs text-slate-500">₹{day.cost}</p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
   );
 }
 
-function SummaryCard({ icon, label, value, gradient }) {
+function SummaryCard({ label, value, tone }) {
+  const color = tone === 'amber' ? 'text-[var(--vivid-amber)]' : tone === 'lavender' ? 'text-[var(--soft-lavender)]' : 'text-[var(--electric-emerald)]';
   return (
-    <div className="glass-card p-4 group hover:scale-[1.02] transition-transform">
-      <div className="flex items-center gap-2 mb-2">
-        <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center text-sm`}>
-          {icon}
-        </div>
-        <span className="text-xs text-slate-400 uppercase tracking-wider">{label}</span>
-      </div>
-      <p className="text-xl font-bold text-white">{value}</p>
+    <div className="glass-card rounded-2xl border border-white/10 p-4">
+      <p className="text-[11px] uppercase tracking-[0.16em] text-[var(--text-muted)]">{label}</p>
+      <p className={`mt-2 text-2xl font-extrabold ${color}`}>{value}</p>
     </div>
   );
 }

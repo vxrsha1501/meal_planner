@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { scanMealImage } from '../api';
 
-/**
- * MealSection — Reusable component for Breakfast/Lunch/Dinner.
- * Shows recommended items with checkboxes, quantity inputs,
- * custom food entry, totals, and save button.
- */
+const MotionSection = motion.section;
+const MotionButton = motion.button;
+const MotionDiv = motion.div;
+
 export default function MealSection({
   mealType,
   foodItems,
@@ -15,6 +16,9 @@ export default function MealSection({
 }) {
   const [selectedItems, setSelectedItems] = useState({});
   const [showCustom, setShowCustom] = useState(false);
+  const [scanMsg, setScanMsg] = useState('');
+  const [scanBusy, setScanBusy] = useState(false);
+  const [quickAddBusyId, setQuickAddBusyId] = useState(null);
   const [customFood, setCustomFood] = useState({
     name: '', calories: '', cost: '', protein: '', quantity: '1',
   });
@@ -27,26 +31,40 @@ export default function MealSection({
 
   const meta = mealLabels[mealType] || { icon: '🍽️', label: mealType };
 
-  // Category badge colors
-  const categoryColors = {
-    protein: 'bg-emerald-500/20 text-emerald-400',
-    carbs: 'bg-amber-500/20 text-amber-400',
-    fruit: 'bg-rose-500/20 text-rose-400',
-    vegetable: 'bg-green-500/20 text-green-400',
-    dairy: 'bg-cyan-500/20 text-cyan-400',
-    fat: 'bg-orange-500/20 text-orange-400',
-    custom: 'bg-violet-500/20 text-violet-400',
-  };
+  const recNames = useMemo(
+    () => new Set((recommendations?.meal_suggestions || []).map((s) => s.name)),
+    [recommendations],
+  );
 
-  // Toggle food item selection
+  const selectedList = useMemo(() => Object.entries(selectedItems).map(([name, val]) => {
+    const food = foodItems.find((f) => f.name === name);
+    if (!food) return null;
+    return {
+      food_item: name,
+      quantity: val.quantity,
+      calories: food.calories * val.quantity,
+      cost: food.cost * val.quantity,
+      protein: (food.protein || 0) * val.quantity,
+    };
+  }).filter(Boolean), [selectedItems, foodItems]);
+
+  let totalCal = selectedList.reduce((s, i) => s + i.calories, 0);
+  let totalCost = selectedList.reduce((s, i) => s + i.cost, 0);
+  let totalProtein = selectedList.reduce((s, i) => s + i.protein, 0);
+
+  const customQty = parseInt(customFood.quantity, 10) || 1;
+  const hasCustom = showCustom && customFood.name && customFood.calories;
+  if (hasCustom) {
+    totalCal += parseInt(customFood.calories, 10) * customQty;
+    totalCost += parseFloat(customFood.cost || 0) * customQty;
+    totalProtein += parseFloat(customFood.protein || 0) * customQty;
+  }
+
   const toggleItem = (name) => {
     setSelectedItems((prev) => {
       const copy = { ...prev };
-      if (copy[name]) {
-        delete copy[name];
-      } else {
-        copy[name] = { quantity: 1 };
-      }
+      if (copy[name]) delete copy[name];
+      else copy[name] = { quantity: 1 };
       return copy;
     });
   };
@@ -58,33 +76,7 @@ export default function MealSection({
     }));
   };
 
-  // Calculate totals for selected items
-  const selectedList = Object.entries(selectedItems).map(([name, val]) => {
-    const food = foodItems.find((f) => f.name === name);
-    if (!food) return null;
-    return {
-      food_item: name,
-      quantity: val.quantity,
-      calories: food.calories * val.quantity,
-      cost: food.cost * val.quantity,
-      protein: (food.protein || 0) * val.quantity,
-    };
-  }).filter(Boolean);
-
-  let totalCal = selectedList.reduce((s, i) => s + i.calories, 0);
-  let totalCost = selectedList.reduce((s, i) => s + i.cost, 0);
-  let totalProtein = selectedList.reduce((s, i) => s + i.protein, 0);
-
-  // Add custom food to totals if filled
-  const customQty = parseInt(customFood.quantity) || 1;
-  const hasCustom = showCustom && customFood.name && customFood.calories;
-  if (hasCustom) {
-    totalCal += parseInt(customFood.calories) * customQty;
-    totalCost += parseFloat(customFood.cost || 0) * customQty;
-    totalProtein += parseFloat(customFood.protein || 0) * customQty;
-  }
-
-  const handleSave = () => {
+  const handleSave = async () => {
     const items = selectedList.map((i) => ({
       food_item: i.food_item,
       quantity: i.quantity,
@@ -94,206 +86,258 @@ export default function MealSection({
       items.push({
         food_item: customFood.name,
         quantity: customQty,
-        calories: parseInt(customFood.calories),
+        calories: parseInt(customFood.calories, 10),
         cost: parseFloat(customFood.cost || 0),
         protein: parseFloat(customFood.protein || 0),
       });
     }
 
     if (items.length === 0) return;
-    onSaveMeal(mealType, items);
+    await onSaveMeal(mealType, items);
+
     setSelectedItems({});
     setShowCustom(false);
     setCustomFood({ name: '', calories: '', cost: '', protein: '', quantity: '1' });
   };
 
-  // Get logged totals for this meal type
   const loggedCal = loggedMeals.reduce((s, m) => s + m.total_calories, 0);
   const loggedCost = loggedMeals.reduce((s, m) => s + m.total_cost, 0);
-  const loggedProtein = loggedMeals.reduce((s, m) => s + m.total_protein, 0);
 
-  // Recommended items (top suggestions from the engine)
-  const recNames = new Set(
-    (recommendations?.meal_suggestions || []).map((s) => s.name)
-  );
+  const handleScan = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setScanBusy(true);
+    setScanMsg('');
+    try {
+      const result = await scanMealImage(file);
+      const a = result.analysis || {};
+
+      const promptedCost = window.prompt(
+        `Detected ${a.food_name || 'food item'}. Enter total cost (INR):`,
+        ''
+      );
+
+      if (promptedCost === null) {
+        setScanMsg('Scan cancelled before cost confirmation.');
+        return;
+      }
+
+      const numericCost = parseFloat(promptedCost);
+      if (!Number.isFinite(numericCost) || numericCost < 0) {
+        setScanMsg('Invalid cost entered. Please scan again and enter a valid number.');
+        return;
+      }
+
+      const detectedItem = {
+        food_item: a.food_name || `Scanned ${meta.label} item`,
+        quantity: 1,
+        calories: Number(a.calories || 0),
+        protein: Number(a.protein_g || 0),
+        carbs: Number(a.carbs_g || 0),
+        fat: Number(a.fat_g || 0),
+        cost: numericCost,
+      };
+
+      setShowCustom(true);
+      setCustomFood({
+        name: detectedItem.food_item,
+        calories: String(detectedItem.calories),
+        cost: String(detectedItem.cost),
+        protein: String(detectedItem.protein),
+        quantity: '1',
+      });
+
+      await onSaveMeal(mealType, [detectedItem]);
+
+      setSelectedItems({});
+      setShowCustom(false);
+      setCustomFood({ name: '', calories: '', cost: '', protein: '', quantity: '1' });
+
+      const macroLine = `cal:${detectedItem.calories} | p:${detectedItem.protein}g | c:${detectedItem.carbs}g | f:${detectedItem.fat}g`;
+      setScanMsg(`Added automatically: ${detectedItem.food_item} (₹${detectedItem.cost}) • ${macroLine}`);
+    } catch (err) {
+      setScanMsg(err.message || 'Scan failed');
+    } finally {
+      setScanBusy(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleQuickAddLogged = async (loggedItem) => {
+    const itemKey = loggedItem.id || `${loggedItem.food_item}-${loggedItem.quantity}`;
+    setQuickAddBusyId(itemKey);
+    try {
+      const matchedFood = foodItems.find((f) => f.name === loggedItem.food_item);
+      if (matchedFood) {
+        await onSaveMeal(mealType, [{
+          food_item: matchedFood.name,
+          quantity: Number(loggedItem.quantity || 1),
+        }]);
+      } else {
+        const qty = Math.max(1, Number(loggedItem.quantity || 1));
+        await onSaveMeal(mealType, [{
+          food_item: loggedItem.food_item,
+          quantity: qty,
+          calories: Number(loggedItem.total_calories || 0) / qty,
+          cost: Number(loggedItem.total_cost || 0) / qty,
+          protein: Number(loggedItem.total_protein || 0) / qty,
+          carbs: Number(loggedItem.total_carbs || 0) / qty,
+          fat: Number(loggedItem.total_fat || 0) / qty,
+        }]);
+      }
+      setScanMsg(`Quick added ${loggedItem.food_item} to ${meta.label}.`);
+    } catch (err) {
+      setScanMsg(err.message || 'Quick add failed.');
+    } finally {
+      setQuickAddBusyId(null);
+    }
+  };
 
   return (
-    <div className="glass-card rounded-2xl p-4 sm:p-5 shadow-lg shadow-black/20 animate-fade-in-up">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4 gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">{meta.icon}</span>
-          <h3 className="text-base sm:text-lg font-semibold text-white">{meta.label}</h3>
+    <MotionSection
+      id={`meal-section-${mealType}`}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+      className="glass-card rounded-[var(--radius-bento)] border border-white/10 p-5"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">Visual Plate</p>
+          <h3 className="text-2xl font-bold text-white">{meta.icon} {meta.label}</h3>
+          <p className="text-xs text-[var(--text-soft)] mt-1">{loggedCal} cal logged • ₹{loggedCost}</p>
         </div>
-        {loggedMeals.length > 0 && (
-          <div className="flex items-center gap-2 sm:gap-3 text-xs">
-            <span className="text-emerald-400">{loggedCal} cal</span>
-            <span className="text-amber-400">₹{loggedCost}</span>
-            <span className="text-cyan-400">{loggedProtein}g protein</span>
-          </div>
-        )}
+
+        <label className="scan-meal-btn cursor-pointer" htmlFor={`scan-${mealType}`}>
+          {scanBusy ? 'Scanning...' : 'Scan Meal'}
+          <input
+            id={`scan-${mealType}`}
+            type="file"
+            accept="image/*"
+            onChange={handleScan}
+            className="hidden"
+          />
+        </label>
       </div>
 
-      {/* Logged meals summary */}
+      {scanMsg && <p className="text-xs text-[var(--soft-lavender)] mb-3">{scanMsg}</p>}
+
       {loggedMeals.length > 0 && (
-        <div className="mb-4 p-3 rounded-lg bg-white/[0.03] border border-white/5">
-          <p className="text-xs text-slate-500 mb-2">Logged items:</p>
-          <div className="space-y-1">
-            {loggedMeals.map((m, idx) => (
-              <div key={idx} className="flex items-center justify-between text-xs">
-                <span className="text-slate-300">
-                  {m.food_item} {m.quantity > 1 && `×${m.quantity}`}
-                </span>
-                <span className="text-slate-500">{m.total_calories} cal · ₹{m.total_cost}</span>
-              </div>
-            ))}
+        <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+          <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)] mb-2">Quick Add From Logged</p>
+          <div className="flex flex-wrap gap-2">
+            {loggedMeals.slice(0, 8).map((m, idx) => {
+              const itemKey = m.id || `${m.food_item}-${m.quantity}-${idx}`;
+              const loading = quickAddBusyId === itemKey;
+              return (
+                <button
+                  key={itemKey}
+                  type="button"
+                  onClick={() => handleQuickAddLogged(m)}
+                  disabled={loading || isLogging}
+                  className="command-chip"
+                >
+                  {loading ? 'Adding...' : `+ ${m.food_item}`}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* Food items list with checkboxes */}
-      <div className="space-y-2 max-h-56 overflow-y-auto mb-4 pr-1">
+      <div className="food-gallery-grid">
         {foodItems.map((food) => {
           const isSelected = !!selectedItems[food.name];
           const isRecommended = recNames.has(food.name);
 
           return (
-            <div
+            <MotionButton
+              type="button"
               key={food.name}
-              className={`flex items-start sm:items-center justify-between py-2 px-3 rounded-lg transition-all cursor-pointer gap-2 ${
-                isSelected
-                  ? 'bg-emerald-500/10 border border-emerald-500/20'
-                  : 'bg-white/[0.02] border border-transparent hover:bg-white/[0.05]'
-              }`}
               onClick={() => toggleItem(food.name)}
+              whileTap={{ scale: 0.98 }}
+              whileHover={{ y: -2 }}
+              transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+              className={`food-card ${isSelected ? 'food-card-selected' : ''} ${isRecommended ? 'food-card-recommended' : ''}`}
             >
-              <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => toggleItem(food.name)}
-                  className="custom-checkbox"
-                  onClick={(e) => e.stopPropagation()}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                    <span className="text-sm text-slate-200 truncate">{food.name}</span>
-                    {isRecommended && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-medium">
-                        Recommended
-                      </span>
-                    )}
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
-                      categoryColors[food.category] || 'bg-slate-500/20 text-slate-400'
-                    }`}>
-                      {food.category}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[11px] text-slate-500 mt-0.5">
-                    <span>{food.calories} cal</span>
-                    <span>₹{food.cost}</span>
-                    <span>{food.protein || 0}g protein</span>
-                  </div>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-white">{food.name}</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">{food.category}</p>
                 </div>
+                {isRecommended && <span className="ai-tag">AI</span>}
               </div>
+
+              <div className="mt-3 flex items-center gap-3 text-xs">
+                <span className="text-[var(--electric-emerald)]">{food.calories} cal</span>
+                <span className="text-[var(--vivid-amber)]">₹{food.cost}</span>
+                <span className="text-[var(--soft-lavender)]">{food.protein || 0}g</span>
+              </div>
+
               {isSelected && (
-                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    onClick={() => setItemQuantity(food.name, selectedItems[food.name].quantity - 1)}
-                    className="w-7 h-7 sm:w-6 sm:h-6 rounded bg-white/10 text-sm sm:text-xs text-slate-300 hover:bg-white/20 flex items-center justify-center"
-                  >−</button>
-                  <span className="text-xs text-white w-6 sm:w-5 text-center">
-                    {selectedItems[food.name].quantity}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setItemQuantity(food.name, selectedItems[food.name].quantity + 1)}
-                    className="w-7 h-7 sm:w-6 sm:h-6 rounded bg-white/10 text-sm sm:text-xs text-slate-300 hover:bg-white/20 flex items-center justify-center"
-                  >+</button>
+                <div className="mt-3 inline-flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <button type="button" className="qty-btn" onClick={() => setItemQuantity(food.name, selectedItems[food.name].quantity - 1)}>−</button>
+                  <span className="text-sm text-white w-6 text-center">{selectedItems[food.name].quantity}</span>
+                  <button type="button" className="qty-btn" onClick={() => setItemQuantity(food.name, selectedItems[food.name].quantity + 1)}>+</button>
                 </div>
               )}
-            </div>
+            </MotionButton>
           );
         })}
       </div>
 
-      {/* Custom food entry */}
-      <div className="mb-4">
-        <button
-          type="button"
-          onClick={() => setShowCustom(!showCustom)}
-          className="text-xs text-cyan-400 hover:text-cyan-300 font-medium"
-        >
-          {showCustom ? '✕ Hide custom food' : '+ Add custom food'}
+      <div className="mt-4">
+        <button type="button" onClick={() => setShowCustom((v) => !v)} className="text-xs text-[var(--soft-lavender)] font-medium">
+          {showCustom ? 'Hide custom item' : 'Add custom item'}
         </button>
 
-        {showCustom && (
-          <div className="mt-3 p-3 rounded-lg bg-white/[0.03] border border-white/5 space-y-2 animate-fade-in-up">
-            <input
-              type="text"
-              value={customFood.name}
-              onChange={(e) => setCustomFood({ ...customFood, name: e.target.value })}
-              placeholder="Food name"
-              className="input-field text-xs py-2"
-            />
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <input
-                type="number"
-                value={customFood.calories}
-                onChange={(e) => setCustomFood({ ...customFood, calories: e.target.value })}
-                placeholder="Cal"
-                className="input-field text-xs py-2"
-              />
-              <input
-                type="number"
-                value={customFood.cost}
-                onChange={(e) => setCustomFood({ ...customFood, cost: e.target.value })}
-                placeholder="₹ Cost"
-                className="input-field text-xs py-2"
-              />
-              <input
-                type="number"
-                value={customFood.protein}
-                onChange={(e) => setCustomFood({ ...customFood, protein: e.target.value })}
-                placeholder="Protein"
-                className="input-field text-xs py-2"
-              />
-              <input
-                type="number"
-                value={customFood.quantity}
-                onChange={(e) => setCustomFood({ ...customFood, quantity: e.target.value })}
-                placeholder="Qty"
-                className="input-field text-xs py-2"
-                min="1"
-              />
-            </div>
-          </div>
-        )}
+        <AnimatePresence>
+          {showCustom && (
+            <MotionDiv
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 12 }}
+              transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+              className="mt-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3 grid grid-cols-2 md:grid-cols-5 gap-2"
+            >
+              <input type="text" value={customFood.name} onChange={(e) => setCustomFood({ ...customFood, name: e.target.value })} placeholder="Name" className="input-field col-span-2 md:col-span-1" />
+              <input type="number" value={customFood.calories} onChange={(e) => setCustomFood({ ...customFood, calories: e.target.value })} placeholder="Calories" className="input-field" />
+              <input type="number" value={customFood.cost} onChange={(e) => setCustomFood({ ...customFood, cost: e.target.value })} placeholder="Cost" className="input-field" />
+              <input type="number" value={customFood.protein} onChange={(e) => setCustomFood({ ...customFood, protein: e.target.value })} placeholder="Protein" className="input-field" />
+              <input type="number" min="1" value={customFood.quantity} onChange={(e) => setCustomFood({ ...customFood, quantity: e.target.value })} placeholder="Qty" className="input-field" />
+            </MotionDiv>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Totals */}
-      {(selectedList.length > 0 || hasCustom) && (
-        <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/20 mb-3">
-          <div className="flex items-center gap-4 text-xs">
-            <span className="text-emerald-400 font-semibold">🔥 {totalCal} cal</span>
-            <span className="text-amber-400 font-semibold">💰 ₹{totalCost}</span>
-            <span className="text-cyan-400 font-semibold">🥩 {totalProtein}g</span>
-          </div>
-          <span className="text-[10px] text-slate-500">
-            {selectedList.length + (hasCustom ? 1 : 0)} items
-          </span>
-        </div>
-      )}
+      <AnimatePresence>
+        {(selectedList.length > 0 || hasCustom) && (
+          <MotionDiv
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+            className="mt-4 rounded-2xl border border-white/10 bg-white/[0.04] p-3 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-4 text-xs">
+              <span className="text-[var(--electric-emerald)]">{totalCal} cal</span>
+              <span className="text-[var(--vivid-amber)]">₹{totalCost}</span>
+              <span className="text-[var(--soft-lavender)]">{Math.round(totalProtein)}g protein</span>
+            </div>
+            <span className="text-xs text-[var(--text-muted)]">{selectedList.length + (hasCustom ? 1 : 0)} items</span>
+          </MotionDiv>
+        )}
+      </AnimatePresence>
 
-      {/* Save button */}
-      <button
+      <MotionButton
+        whileTap={{ scale: 0.98 }}
+        transition={{ type: 'spring', stiffness: 100, damping: 20 }}
         onClick={handleSave}
         disabled={isLogging || (selectedList.length === 0 && !hasCustom)}
-        className="btn-primary w-full text-center text-sm"
+        className="btn-primary w-full mt-4"
       >
-        {isLogging ? 'Saving...' : `Save ${meta.label}`}
-      </button>
-    </div>
+        {isLogging ? 'Logging meal...' : `Log ${meta.label}`}
+      </MotionButton>
+    </MotionSection>
   );
 }

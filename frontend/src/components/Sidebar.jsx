@@ -9,6 +9,7 @@ export default function Sidebar({ onLogout }) {
 
   const navItems = [
     { to: '/dashboard', icon: '📊', label: 'Dashboard' },
+    { to: '/workout', icon: '🏋️', label: 'Workout' },
     { to: '/profile', icon: '👤', label: 'Profile' },
     { to: '/weekly-report', icon: '📈', label: 'Weekly Report' },
   ];

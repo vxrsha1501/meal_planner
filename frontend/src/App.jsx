@@ -12,6 +12,7 @@ import './index.css';
 
 const Sidebar = lazy(() => import('./components/Sidebar'));
 const Dashboard = lazy(() => import('./components/Dashboard'));
+const WorkoutPlanner = lazy(() => import('./components/WorkoutPlanner'));
 const Profile = lazy(() => import('./components/Profile'));
 const WeeklyReport = lazy(() => import('./components/WeeklyReport'));
 
@@ -44,6 +45,11 @@ export default function App() {
     queryKey: ['dashboard'],
     queryFn: getDashboard,
     enabled: !!user,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    staleTime: Infinity,
+    gcTime: 1000 * 60 * 60,
   });
 
   const foodItemsQuery = useQuery({
@@ -51,6 +57,11 @@ export default function App() {
     queryFn: getFoodItems,
     enabled: !!user,
     select: (data) => data.food_items || [],
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    staleTime: Infinity,
+    gcTime: 1000 * 60 * 60,
   });
 
   // ── Auth handlers ──
@@ -111,20 +122,23 @@ export default function App() {
   };
 
   const routeLoadingFallback = (
-    <div className="flex items-center justify-center h-64">
-      <p className="text-slate-500">Loading section...</p>
+    <div className="bento-skeleton-grid">
+      <div className="bento-skeleton tile-span-8" />
+      <div className="bento-skeleton tile-span-4" />
+      <div className="bento-skeleton tile-span-12" />
     </div>
   );
 
   // ── Loading screen while checking session ──
   if (meQuery.isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-2xl mx-auto mb-4 animate-pulse-glow">
-            🧠
-          </div>
-          <p className="text-sm text-slate-500">Loading...</p>
+      <div className="min-h-screen max-w-6xl mx-auto px-4 py-6 sm:px-6">
+        <div className="bento-skeleton-grid">
+          <div className="bento-skeleton tile-span-8" />
+          <div className="bento-skeleton tile-span-4" />
+          <div className="bento-skeleton tile-span-12" />
+          <div className="bento-skeleton tile-span-6" />
+          <div className="bento-skeleton tile-span-6" />
         </div>
       </div>
     );
@@ -167,6 +181,7 @@ export default function App() {
                   />
                 }
               />
+              <Route path="/workout" element={<WorkoutPlanner />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/weekly-report" element={<WeeklyReport />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
