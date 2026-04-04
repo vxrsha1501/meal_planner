@@ -5,7 +5,7 @@ from typing import Any, Literal
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_groq import ChatGroq
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ..settings import settings
 
@@ -33,8 +33,53 @@ class RecipeStep(BaseModel):
     instruction: str
 
 
+class WorkoutExerciseStructured(BaseModel):
+    name: str = Field(min_length=2)
+    sets: int = Field(ge=1, le=8)
+    reps_min: int = Field(ge=1, le=50)
+    reps_max: int = Field(ge=1, le=60)
+    rest_seconds: int = Field(ge=15, le=240)
+    target_muscles: list[str] = Field(default_factory=list, min_length=1)
+    notes: str = ""
+
+    @model_validator(mode="after")
+    def validate_rep_range(self) -> "WorkoutExerciseStructured":
+        if self.reps_max < self.reps_min:
+            raise ValueError("reps_max must be greater than or equal to reps_min")
+        return self
+
+
+class WorkoutPlanStructured(BaseModel):
+    title: str = Field(min_length=5)
+    focus: str = Field(min_length=3)
+    duration_min: int = Field(ge=15, le=120)
+    intensity: Literal["light", "moderate", "intense", "extreme"]
+    warmup_steps: list[str] = Field(default_factory=list, min_length=2, max_length=5)
+    exercises: list[WorkoutExerciseStructured] = Field(default_factory=list, min_length=2, max_length=8)
+    cooldown_steps: list[str] = Field(default_factory=list, min_length=1, max_length=4)
+    safety_note: str = Field(min_length=10)
+
+    @field_validator("title", "focus", "safety_note")
+    @classmethod
+    def no_placeholder_text(cls, value: str) -> str:
+        lowered = value.strip().lower()
+        blocked = {"n/a", "na", "none", "custom plan", "unknown", "tbd", "-"}
+        if lowered in blocked:
+            raise ValueError("placeholder text is not allowed")
+        return value
+
+    @field_validator("warmup_steps", "cooldown_steps")
+    @classmethod
+    def no_placeholder_steps(cls, value: list[str]) -> list[str]:
+        blocked = {"n/a", "na", "none", "unknown", "-"}
+        for step in value:
+            if step.strip().lower() in blocked:
+                raise ValueError("placeholder step is not allowed")
+        return value
+
+
 class WorkoutMealPlanStructured(BaseModel):
-    workout_plan: dict[str, Any]
+    workout_plan: WorkoutPlanStructured
     meal_suggestions: list[MealOption] = Field(default_factory=list)
     recipes: list[dict[str, Any]] = Field(default_factory=list)
     summary: str
@@ -227,10 +272,55 @@ async def generate_workout_and_meal_plan(workout_preference: str, notes: str, co
         fallback = {
             "workout_plan": {
                 "title": "AI unavailable",
-                "duration": "N/A",
-                "intensity": "unknown",
+                "duration_min": 30,
+                "intensity": "moderate",
                 "focus": workout_preference,
-                "plan_steps": [],
+                "warmup_steps": [
+                    "5 minutes brisk walk",
+                    "Dynamic mobility for shoulders and hips",
+                ],
+                "exercises": [
+                    {
+                        "name": "Bodyweight Squat",
+                        "sets": 3,
+                        "reps_min": 10,
+                        "reps_max": 12,
+                        "rest_seconds": 60,
+                        "target_muscles": ["quads", "glutes"],
+                        "notes": "Controlled tempo",
+                    },
+                    {
+                        "name": "Push-up",
+                        "sets": 3,
+                        "reps_min": 8,
+                        "reps_max": 12,
+                        "rest_seconds": 60,
+                        "target_muscles": ["chest", "triceps"],
+                        "notes": "Knee variation if needed",
+                    },
+                    {
+                        "name": "Bent-over Dumbbell Row",
+                        "sets": 3,
+                        "reps_min": 10,
+                        "reps_max": 12,
+                        "rest_seconds": 60,
+                        "target_muscles": ["back", "biceps"],
+                        "notes": "Keep neutral spine",
+                    },
+                    {
+                        "name": "Plank",
+                        "sets": 3,
+                        "reps_min": 30,
+                        "reps_max": 45,
+                        "rest_seconds": 45,
+                        "target_muscles": ["core"],
+                        "notes": "Treat reps as seconds",
+                    },
+                ],
+                "cooldown_steps": [
+                    "3 minutes easy walk and deep breathing",
+                ],
+                "safety_note": "Stop immediately if you feel sharp pain or dizziness.",
             },
             "meal_suggestions": [],
             "recipes": [],
@@ -247,7 +337,9 @@ async def generate_workout_and_meal_plan(workout_preference: str, notes: str, co
     system_prompt = (
         "You are an expert fitness and nutrition coach. "
         "Generate a workout plan first, then meal suggestions, then practical recipes. "
-        "Keep it safe, realistic, and budget-aware."
+        "Keep it safe, realistic, and budget-aware. "
+        "Never use placeholder values such as N/A, unknown, or Custom Plan. "
+        "Workout output must be specific with exact set/rep/rest ranges and progression-safe intensity."
     )
 
     user_prompt = (
@@ -255,26 +347,76 @@ async def generate_workout_and_meal_plan(workout_preference: str, notes: str, co
         f"Additional notes: {notes}. "
         f"User context: {context}. "
         "Return JSON with: workout_plan, meal_suggestions, recipes, summary. "
-        "Workout plan must include a step-by-step plan_steps array. "
+        "workout_plan must include title, focus, duration_min, intensity, warmup_steps, exercises, cooldown_steps, safety_note. "
+        "Each exercise must include name, sets, reps_min, reps_max, rest_seconds, target_muscles, notes. "
         "Each recipe must include name, prep_time_min, ingredients, and steps."
     )
 
-    structured = await chat.ainvoke([
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=user_prompt),
-    ])
+    try:
+        structured = await chat.ainvoke([
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt),
+        ])
 
-    analysis = structured.model_dump() if hasattr(structured, "model_dump") else dict(structured)
-    return {
-        "analysis": analysis,
-        "analysis_pretty": _to_pretty_json(analysis),
-    }
+        analysis = structured.model_dump() if hasattr(structured, "model_dump") else dict(structured)
+        return {
+            "analysis": analysis,
+            "analysis_pretty": _to_pretty_json(analysis),
+        }
+    except Exception as exc:
+        fallback = {
+            "workout_plan": {
+                "title": f"{workout_preference.title() or 'Custom'} Plan",
+                "duration_min": 40,
+                "intensity": "moderate",
+                "focus": workout_preference or "general fitness",
+                "warmup_steps": [
+                    "5 minutes brisk walk or cycling",
+                    "Dynamic mobility for target joints",
+                ],
+                "exercises": [
+                    {
+                        "name": "Compound movement",
+                        "sets": 3,
+                        "reps_min": 8,
+                        "reps_max": 12,
+                        "rest_seconds": 60,
+                        "target_muscles": [workout_preference or "full body"],
+                        "notes": "Use controlled form",
+                    },
+                    {
+                        "name": "Accessory movement",
+                        "sets": 3,
+                        "reps_min": 10,
+                        "reps_max": 15,
+                        "rest_seconds": 60,
+                        "target_muscles": [workout_preference or "full body"],
+                        "notes": "Stop 1-2 reps before failure",
+                    },
+                ],
+                "cooldown_steps": [
+                    "3-5 minutes easy walk and stretching",
+                ],
+                "safety_note": "If you feel sharp pain, stop and reduce load before retrying.",
+            },
+            "meal_suggestions": [],
+            "recipes": [],
+            "summary": f"Structured generation fallback used due to model validation error: {exc}",
+        }
+        return {
+            "analysis": fallback,
+            "analysis_pretty": _to_pretty_json(fallback),
+        }
 
 
-async def generate_ai_recipe_recommendations(context: dict) -> list[dict[str, Any]]:
+async def generate_ai_recipe_recommendations(context: dict) -> dict[str, Any]:
     groq_key = _get_groq_key()
     if not groq_key:
-        return []
+        return {
+            "recipes": [],
+            "status": "missing_key",
+            "message": "Groq API key missing. Set GROQ_API_KEY (or API_KEY).",
+        }
 
     chat = ChatGroq(
         api_key=groq_key,
@@ -300,6 +442,15 @@ async def generate_ai_recipe_recommendations(context: dict) -> list[dict[str, An
             HumanMessage(content=user_prompt),
         ])
         parsed = structured.model_dump() if hasattr(structured, "model_dump") else dict(structured)
-        return parsed.get("recipes", [])
-    except Exception:
-        return []
+        recipes = parsed.get("recipes", [])
+        return {
+            "recipes": recipes,
+            "status": "ok" if recipes else "empty",
+            "message": "" if recipes else "AI returned no recipes for current scenario.",
+        }
+    except Exception as exc:
+        return {
+            "recipes": [],
+            "status": "error",
+            "message": f"AI recipe generation failed: {exc}",
+        }

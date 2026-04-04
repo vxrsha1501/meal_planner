@@ -62,7 +62,10 @@ async def get_dashboard(current_user=Depends(get_current_user), supabase=Depends
         "protein_consumed": total_protein,
         "top_meal_suggestions": [item.get("name") for item in recommendations.get("meal_suggestions", [])],
     }
-    recommendations["ai_recommended_recipes"] = await generate_ai_recipe_recommendations(ai_recipe_context)
+    ai_recipe_result = await generate_ai_recipe_recommendations(ai_recipe_context)
+    recommendations["ai_recommended_recipes"] = ai_recipe_result.get("recipes", [])
+    recommendations["ai_recipe_status"] = ai_recipe_result.get("status", "unknown")
+    recommendations["ai_recipe_message"] = ai_recipe_result.get("message", "")
 
     workout_rows = (
         supabase.table("workout_log")
